@@ -23,6 +23,8 @@ public:
     void refreshUI() override;
     void onEnter() override;
     void onExit() override;
+    void onHide() override;
+    void onShow() override;
     bool handleKey(const KeyEvent& event) override;
     bool handleLongPress() override;
 
@@ -162,7 +164,7 @@ private:
     int _sendMenuIdx = 0;
     bool _suppressNextSendClick = false;
 
-    // Every label points into the client's leased publication, never a body copy.
+    // Visible-page labels own bounded text copies so hidden tabs can be retained.
     std::array<lv_obj_t*, HistoryWindow::VisibleSpans> _statusLabels{}, _textLabels{}, _bubbleBoxes{}, _readButtons{}, _audioErrors{};
 
     static constexpr size_t MAX_COMPOSER_CHARS = 120;

@@ -31,6 +31,9 @@ void setEnabled(bool enabled);
 
 // Get the LVGL input group (for focusing widgets)
 lv_group_t* group();
+// Retained screens own separate focus groups; only the visible one receives input.
+lv_group_t* createGroup();
+void setGroup(lv_group_t* group);
 
 // Navbar (tab-cycling) mode: hide the in-content focus ring. Group focus stays
 // logical so entering the screen restores the ring on the last-focused widget.

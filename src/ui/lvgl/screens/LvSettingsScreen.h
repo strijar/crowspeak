@@ -64,6 +64,8 @@ public:
     void createUI(lv_obj_t* parent) override;
     void onEnter() override;
     void onExit() override;
+    void onHide() override;
+    void onShow() override;
     void refreshUI() override;
     bool handleKey(const KeyEvent& event) override;
     bool handleLongPress() override;

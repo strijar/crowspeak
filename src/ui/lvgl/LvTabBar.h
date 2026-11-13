@@ -18,7 +18,7 @@ public:
 
     void create(lv_obj_t* parent);
 
-    void setActiveTab(int tab);
+    void setActiveTab(int tab, bool notify = true);
     int getActiveTab() const { return _activeTab; }
     void cycleTab(int direction);
 
@@ -27,7 +27,9 @@ public:
     using TabCallback = void(*)(int tab);
     void setTabCallback(TabCallback cb) { _tabCb = cb; }
 
-    lv_obj_t* obj() { return _bar; }
+    lv_obj_t* obj() { return lv_tabview_get_tab_btns(_view); }
+    lv_obj_t* view() { return _view; }
+    lv_obj_t* page(int tab) { return _pages[tab]; }
 
     // Re-apply palette-dependent label colors after a theme switch
     void refreshTabs();
@@ -35,11 +37,8 @@ public:
 private:
     void refreshTab(int idx);
 
-    lv_obj_t* _bar = nullptr;
-    lv_obj_t* _cells[TAB_COUNT] = {};
-    lv_obj_t* _labels[TAB_COUNT] = {};
-    lv_obj_t* _badges[TAB_COUNT] = {};
-    lv_obj_t* _badgeLabels[TAB_COUNT] = {};
+    lv_obj_t* _view = nullptr;
+    lv_obj_t* _pages[TAB_COUNT] = {};
     int _activeTab = TAB_HOME;
     int _unread[TAB_COUNT] = {};
     TabCallback _tabCb = nullptr;

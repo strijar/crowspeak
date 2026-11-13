@@ -32,10 +32,6 @@ static lv_style_t s_scrollbar;
 static lv_style_t s_roller;
 static lv_style_t s_statusBar;
 static lv_style_t s_statusToast;
-static lv_style_t s_tabBar;
-static lv_style_t s_tabCell;
-static lv_style_t s_tabCellActive;
-static lv_style_t s_badge;
 
 // Palette-dependent props only; re-run on scheme change.
 static void applyColors() {
@@ -102,18 +98,8 @@ static void applyColors() {
     lv_style_set_bg_color(&s_statusToast, lv_color_hex(Theme::TOAST_BG));
     lv_style_set_text_color(&s_statusToast, lv_color_hex(Theme::BG));
 
-    lv_style_set_bg_color(&s_tabBar, lv_color_hex(Theme::TAB_BG));
-    lv_style_set_border_color(&s_tabBar, lv_color_hex(Theme::DIVIDER));
 
-    lv_style_set_bg_color(&s_tabCell, lv_color_hex(Theme::TAB_BG));
-    lv_style_set_text_color(&s_tabCell, lv_color_hex(Theme::TAB_INACTIVE));
 
-    lv_style_set_bg_color(&s_tabCellActive, lv_color_hex(Theme::TAB_ACTIVE_BG));
-    lv_style_set_border_color(&s_tabCellActive, lv_color_hex(Theme::PRIMARY));
-    lv_style_set_text_color(&s_tabCellActive, lv_color_hex(Theme::TAB_ACTIVE));
-
-    lv_style_set_bg_color(&s_badge, lv_color_hex(Theme::BADGE_BG));
-    lv_style_set_text_color(&s_badge, lv_color_hex(Theme::BG));
 }
 
 void init(lv_disp_t* disp) {
@@ -266,34 +252,6 @@ void init(lv_disp_t* disp) {
     lv_style_set_pad_all(&s_statusToast, 0);
     lv_style_set_radius(&s_statusToast, 0);
 
-    lv_style_init(&s_tabBar);
-    lv_style_set_bg_opa(&s_tabBar, LV_OPA_COVER);
-    lv_style_set_border_width(&s_tabBar, 1);
-    lv_style_set_border_side(&s_tabBar, LV_BORDER_SIDE_TOP);
-    lv_style_set_pad_all(&s_tabBar, 0);
-    lv_style_set_pad_gap(&s_tabBar, 0);
-    lv_style_set_radius(&s_tabBar, 0);
-
-    lv_style_init(&s_tabCell);
-    lv_style_set_bg_opa(&s_tabCell, LV_OPA_COVER);
-    lv_style_set_border_width(&s_tabCell, 0);
-    lv_style_set_text_font(&s_tabCell, &lv_font_rsdeck_10);
-    lv_style_set_pad_all(&s_tabCell, 0);
-    lv_style_set_radius(&s_tabCell, 0);
-
-    // Active tab is the sole "tab-cycling" indicator (content focus ring is
-    // suppressed in navbar mode) — 3px PRIMARY notch reads clearly in both palettes
-    lv_style_init(&s_tabCellActive);
-    lv_style_set_bg_opa(&s_tabCellActive, LV_OPA_COVER);
-    lv_style_set_border_width(&s_tabCellActive, 3);
-    lv_style_set_border_side(&s_tabCellActive, LV_BORDER_SIDE_TOP);
-
-    lv_style_init(&s_badge);
-    lv_style_set_bg_opa(&s_badge, LV_OPA_COVER);
-    lv_style_set_text_font(&s_badge, &lv_font_rsdeck_10);
-    lv_style_set_radius(&s_badge, 3);
-    lv_style_set_pad_all(&s_badge, 0);
-
     applyColors();
 
     // Apply screen style to default theme
@@ -334,9 +292,5 @@ lv_style_t* styleScrollbar()        { return &s_scrollbar; }
 lv_style_t* styleRoller()           { return &s_roller; }
 lv_style_t* styleStatusBar()        { return &s_statusBar; }
 lv_style_t* styleStatusToast()      { return &s_statusToast; }
-lv_style_t* styleTabBar()           { return &s_tabBar; }
-lv_style_t* styleTabCell()          { return &s_tabCell; }
-lv_style_t* styleTabCellActive()    { return &s_tabCellActive; }
-lv_style_t* styleBadge()            { return &s_badge; }
 
 }  // namespace LvTheme

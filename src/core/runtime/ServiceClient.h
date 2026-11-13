@@ -107,6 +107,9 @@ public:
     void closeHistory();
     void watchConversations();
     void closeConversations();
+    // Pause new presentation reads; accepted mailbox work still completes.
+    void pauseHistory(bool paused) { _historyPaused = paused; }
+    void pauseConversations(bool paused) { _conversationsPaused = paused; }
     history::ConversationList& conversationWindow() { return _conversationWindow; }
     const history::ConversationList& conversationWindow() const { return _conversationWindow; }
     history::HistoryWindow& historyWindow() { return _history; }
@@ -165,6 +168,7 @@ private:
     bool _identitiesPending = false;
     std::vector<IdentitySlot> _identities;
     history::HistoryWindow _history;
+    bool _historyPaused = false, _conversationsPaused = false;
     rrc::Conversation _rrcConversation;
     uint32_t _rrcViewRevision = 0;
     bool _rrcHistory = false;

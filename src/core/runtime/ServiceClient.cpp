@@ -269,6 +269,7 @@ void ServiceClient::requestNodes() {
 }
 
 void ServiceClient::watchHistory(const std::string& peer) {
+    _historyPaused = false;
     if (_rrcHistory) closeHistory();
     uint8_t decoded[16];
     if (!storage::decodeHex(peer.data(), peer.size(), decoded, 16)) { closeHistory(); return; }
@@ -288,7 +289,8 @@ void ServiceClient::closeHistory() {
 }
 
 void ServiceClient::requestHistory() {
-    if (_conversationWindow.state() == history::ConversationList::State::Closed &&
+    if (_historyPaused) return;
+    if ((_conversationsPaused || _conversationWindow.state() == history::ConversationList::State::Closed) &&
         _conversationWindow.ownerTicket().valid()) return;
     const auto query = _history.next(millis());
     using Window = history::HistoryWindow;
@@ -308,13 +310,14 @@ void ServiceClient::requestHistory() {
 
 #include "RrcClient.inc"
 
-void ServiceClient::watchConversations() { _conversationWindow.resume(_status.generation); }
+void ServiceClient::watchConversations() { _conversationsPaused = false; _conversationWindow.resume(_status.generation); }
 void ServiceClient::closeConversations() { _conversationWindow.close(); }
 
 void ServiceClient::requestConversationWindow() {
+    if (_conversationsPaused) return;
     // A hidden chat still owns its accepted read until the mailbox releases it.
     // Let that credit retire before asking the shared reader for the list.
-    if (_history.state() == history::HistoryWindow::State::Closed && _history.ownerTicket().valid()) return;
+    if ((_historyPaused || _history.state() == history::HistoryWindow::State::Closed) && _history.ownerTicket().valid()) return;
     using Window = history::ConversationList;
     const auto query = _conversationWindow.next(millis());
     if (query.kind == Window::Kind::None) return;

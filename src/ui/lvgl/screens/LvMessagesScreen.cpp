@@ -189,6 +189,28 @@ void LvMessagesScreen::detachRows() {
     _rowCount=0;_boundRevision=0;_boundIdentity=0;_namesResolved=0;_nameFailed=false;
     _binding=false;
 }
+void LvMessagesScreen::onHide() {
+    if (bound()) reportViewport();
+    _active = false;
+    _rrc.visible(false);
+    hideActionMenu();
+    if (_service) _service->pauseConversations(true);
+}
+
+void LvMessagesScreen::onShow() {
+    _active = true;
+    _rrc.visible(handheld::ui::RrcEnabled);
+    if (_service) {
+        auto& window = _service->conversationWindow();
+        if (window.state() == handheld::history::ConversationList::State::Closed ||
+            window.identityGeneration() != _service->status().generation) {
+            if (_rrc.navigation.direct()) _service->watchConversations();
+        }
+        _service->pauseConversations(false);
+    }
+    refreshUI();
+}
+
 void LvMessagesScreen::onExit() {
     if (bound()) reportViewport();
     _active=false;_rrc.visible(false);clearRrc();hideActionMenu();detachRows();
@@ -199,7 +221,7 @@ void LvMessagesScreen::onExit() {
     }
 }
 void LvMessagesScreen::destroyUI() {
-    onExit();_list=nullptr;_empty=nullptr;_update=nullptr;_emptyState=nullptr;
+    _list=nullptr;_empty=nullptr;_update=nullptr;_emptyState=nullptr;
     for (auto& button:_navigation) button=nullptr;
     for (auto& button:_family) button=nullptr;
     LvScreen::destroyUI();
@@ -296,8 +318,8 @@ void LvMessagesScreen::bindRows() {
         }
         widgets.preview=label(row,&lv_font_rsdeck_12,Theme::TEXT_SECONDARY,TextX,PreviewY,Theme::CONTENT_W-TextX-8);
         lv_obj_set_height(widgets.preview,lv_font_get_line_height(&lv_font_rsdeck_12));
-        // CLIP never mutates borrowed bytes; DOT is forbidden for bank pointers.
-        lv_label_set_text_static(widgets.preview,(value.flags&Row::Unavailable)?"Message unavailable":
+        // Retained widgets own their text even while the service publishes a new bank.
+        lv_label_set_text(widgets.preview,(value.flags&Row::Unavailable)?"Message unavailable":
             value.previewLength?value.preview:"No preview");
         if (value.flags&Row::PreviewTruncated) {
             lv_obj_set_width(widgets.preview,Theme::CONTENT_W-TextX-23);

@@ -860,6 +860,36 @@ void LvMessageView::onEnter() {
     clearMessages(); refreshUI();
 }
 
+void LvMessageView::onHide() {
+    dismissSelection();
+    _selectAfterPage = false;
+    _messageTools.close(); _rrcTools.close(); hideSendModeMenu();
+    if (_ui) _ui->closeVoiceConversation();
+    _rrcSendRequested = false;
+    if (_rrcMode) saveRrcDraft(true);
+    else if (_service && (!_sendPending || _retainedDraftPeer == _peerHex)) {
+        _retainedDraft = _inputText; _retainedDraftPeer = _peerHex;
+        _retainedDraftRevision = _draftRevision;
+        _retainedDraftIdentity = _service->status().generation;
+    }
+    saveScroll();
+    _entered = false;
+    _markReadPending = false;
+    if (_service) _service->pauseHistory(true);
+}
+
+void LvMessageView::onShow() {
+    if (!_service || !windowMatches() ||
+        _service->historyWindow().mode() == HistoryWindow::Mode::Closed) {
+        onEnter();
+        return;
+    }
+    _entered = true;
+    _service->pauseHistory(false);
+    updateComposerText(); updateComposerState();
+    refreshUI();
+}
+
 void LvMessageView::onExit() {
     dismissSelection();
     _selectAfterPage=false;
@@ -1015,7 +1045,7 @@ void LvMessageView::appendMessage(size_t index, const Span& span, const char* te
     lv_obj_set_style_text_color(lbl, lv_color_hex(span.unavailable() ? Theme::TEXT_MUTED : textColor), 0);
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl, textW);
-    lv_label_set_text_static(lbl, text);
+    lv_label_set_text(lbl, text);
     if(!_rrcMode && handheld::ui::generatedAudioText(span,text)) lv_obj_add_flag(lbl,LV_OBJ_FLAG_HIDDEN);
 
     if(_service && !span.unavailable() && !_rrcMode && span.nativeAudio()) {
@@ -1128,7 +1158,7 @@ void LvMessageView::rebuildMessages() {
     _boundMode = window.mode(); _boundIdentity = window.identityGeneration();
     _binding = false; _scrollToEnd = false; saveScroll();
     if(reveal) revealSelection();
-    // ALL old static labels were deleted before this bank can be reused.
+    // Labels own text copies; publication banks may be reused while the tab is hidden.
     window.acknowledgePublication(_lastHistoryRevision);
 }
 

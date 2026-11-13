@@ -53,6 +53,8 @@ software-check: protocol-check check-all
 release: package
 flash: bundle
 	$(PYTHON) -m esptool --chip esp32s3 --port $(PORT) --baud $(UPLOAD_BAUD) --before default_reset --after hard_reset write-flash 0x0 $(BUILD_DIR)/crowpanel-standalone.bin
+monitor: bundle
+	$(PYTHON) -m platformio device monitor --port $(PORT) --baud $(UPLOAD_BAUD)
 clean:
 	rm -rf $(BUILD_DIR) $(DIST_DIR)
 	$(PYTHON) -m platformio run -e $(DEVICE) -t clean

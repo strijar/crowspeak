@@ -21,6 +21,8 @@ public:
     void refreshUI() override;
     void onEnter() override;
     void onExit() override;
+    void onHide() override;
+    void onShow() override;
     bool handleKey(const KeyEvent&) override;
     bool handleLongPress() override;
     const char* title() const override { return "Messages"; }

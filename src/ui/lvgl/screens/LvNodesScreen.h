@@ -20,6 +20,7 @@ public:
     void destroyUI() override;
     void refreshUI() override;
     void onEnter() override;
+    void onHide() override;
     bool handleKey(const KeyEvent& event) override;
 
     void setAnnounceManager(handheld::NodeView* am) { _am = am; }

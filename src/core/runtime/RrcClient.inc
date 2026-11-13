@@ -82,6 +82,7 @@ uint32_t ServiceClient::requestRrcDetail(const rrc::Conversation& binding, const
     return rrcQuery<rrc::MessageDetail, 1>(request, &binding, sizeof binding, std::move(completion));
 }
 uint32_t ServiceClient::watchRrcHistory(const rrc::Conversation& binding, Completion completion) {
+    _historyPaused = false;
     closeHistory();
     if (_rrcViewRevision == UINT32_MAX || binding.room[64] || (binding.room[0] && binding.privateNotice())) return 0;
     _rrcHistory = true; _rrcConversation = binding;

@@ -39,9 +39,5 @@ lv_style_t* styleRoller();
 // Shared shell styles
 lv_style_t* styleStatusBar();
 lv_style_t* styleStatusToast();
-lv_style_t* styleTabBar();
-lv_style_t* styleTabCell();
-lv_style_t* styleTabCellActive();
-lv_style_t* styleBadge();
 
 }  // namespace LvTheme

@@ -318,6 +318,12 @@ void LvNodesScreen::destroyUI() {
     LvScreen::destroyUI();
 }
 
+void LvNodesScreen::onHide() {
+    hideOverlay();
+    _confirmDelete = false;
+    _pressedRow = nullptr; _pressedHex.clear();
+}
+
 void LvNodesScreen::onEnter() {
     _peers.reset();
     _peers.configure(RowHeight, ViewportHeight);

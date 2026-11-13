@@ -167,6 +167,32 @@ at compile time. This targets display shifts during flash writes, including
 keyboard language persistence. Validate repeated RU/EN switches and settings
 saves on hardware while receiving LoRa messages.
 
+## Retained tabs
+
+Navigation uses LVGL 8.3 Tabview with five bottom tabs. Screens are created on
+first visit and retained when switching tabs. Chats also retains one open
+conversation and its composer; Back closes that conversation and returns to the
+list. Settings keeps its current section. Swipe navigation and transition
+animations are disabled.
+
+Only the visible screen is refreshed. Hidden conversation/list views pause new
+history reads while allowing already accepted operations to finish. Displayed
+message text is copied into LVGL labels so retained widgets cannot refer to a
+reused history buffer. Input focus groups are separate for each retained screen.
+Theme changes invalidate cached widget colors and rebuild screens lazily; that
+exception may reset their navigation position.
+
+Each transition prints `[UI] show ...` with elapsed milliseconds, retained screen
+count, LVGL retained/peak bytes, refused allocations, free PSRAM and free internal
+RAM. To measure the cost on hardware, record Home after boot, then visit all five
+tabs and open one conversation. Repeat the route to check that retained memory
+stabilizes. The existing 2 MiB LVGL ceiling and 256 KiB PSRAM reserve remain in force.
+
+Check on the device: return to a scrolled list and a nested Settings section;
+leave and return to a conversation with a draft; receive a message while that
+conversation is hidden (it must remain unread until opened); use Back, change
+theme, and repeat navigation after display sleep/wake.
+
 ## Touch input
 
 Tap a text field to open the editor. Russian and English layouts, Shift,

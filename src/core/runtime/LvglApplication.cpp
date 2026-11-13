@@ -300,7 +300,6 @@ void onHotkeyHelp() {
 }
 void onHotkeyMessages() {
     ::ui.lvTabBar().setActiveTab(LvTabBar::TAB_MSGS);
-    ::ui.setScreen(&lvMessagesScreen);
 }
 void onHotkeyNewMsg() {
     bool hasContacts = false;
@@ -636,8 +635,6 @@ void handheld::lvgl_application::setup() {
     hotkeys.registerHotkey('r', "RSSI Monitor", onHotkeyRssiMonitor);
     hotkeys.setTabCycleCallback([](int dir) {
         ::ui.lvTabBar().cycleTab(dir);
-        int tab = ::ui.lvTabBar().getActiveTab();
-        if (lvTabScreens[tab]) ::ui.setScreen(lvTabScreens[tab]);
     });
     lvBootScreen.setProgress(0.58f, "Hotkeys registered");
     // (LVGL boot renders via lv_timer_handler in setProgress)
@@ -1119,15 +1116,18 @@ void handheld::lvgl_application::setup() {
     lvHelpOverlay.create();
     lvQrOverlay.create();
 
-    // Tab bar callbacks — LVGL
+    // Tabview pages and one retained conversation under Chats.
     lvTabScreens[LvTabBar::TAB_HOME]     = &lvHomeScreen;
     lvTabScreens[LvTabBar::TAB_CONTACTS] = &lvContactsScreen;
     lvTabScreens[LvTabBar::TAB_MSGS]     = &lvMessagesScreen;
     lvTabScreens[LvTabBar::TAB_NODES]    = &lvNodesScreen;
     lvTabScreens[LvTabBar::TAB_SETTINGS] = &lvSettingsScreen;
 
+    for (int tab = 0; tab < LvTabBar::TAB_COUNT; ++tab) ::ui.registerTab(tab, lvTabScreens[tab]);
+    ::ui.registerTabChild(LvTabBar::TAB_MSGS, &lvMessageView);
+
     ::ui.lvTabBar().setTabCallback([](int tab) {
-        if (lvTabScreens[tab]) ::ui.setScreen(lvTabScreens[tab]);
+        ::ui.selectTab(tab);
     });
     bootTraceStage("screen-wiring");
 
@@ -1291,13 +1291,9 @@ static void dispatchKey(const KeyEvent& evt) {
                     bool tabRight = (evt.character == '/') || evt.right;
                     if (tabLeft) {
                         ::ui.lvTabBar().cycleTab(-1);
-                        int tab = ::ui.lvTabBar().getActiveTab();
-                        if (lvTabScreens[tab]) ::ui.setScreen(lvTabScreens[tab]);
                     }
                     if (tabRight) {
                         ::ui.lvTabBar().cycleTab(1);
-                        int tab = ::ui.lvTabBar().getActiveTab();
-                        if (lvTabScreens[tab]) ::ui.setScreen(lvTabScreens[tab]);
                     }
                 }
             }

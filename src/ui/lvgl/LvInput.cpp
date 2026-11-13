@@ -236,6 +236,25 @@ bool feedKey(const KeyEvent& evt) {
     return true;
 }
 
+lv_group_t* createGroup() {
+    auto* group = lv_group_create();
+    lv_group_set_focus_cb(group, group_focus_cb);
+    return group;
+}
+
+void setGroup(lv_group_t* group) {
+    if (!group || s_group == group) return;
+    cancelTouchPress();
+    s_head = s_count = 0; s_releasePending = false;
+    s_group = group;
+    lv_group_set_default(group);
+    for (auto* input = lv_indev_get_next(nullptr); input; input = lv_indev_get_next(input)) {
+        lv_indev_reset(input, nullptr);
+        lv_indev_set_group(input, group);
+    }
+    setFocusSuppressed(s_focusSuppressed);
+}
+
 lv_group_t* group() {
     return s_group;
 }

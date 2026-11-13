@@ -82,9 +82,6 @@ constexpr int CONTENT_W      = SCREEN_W;
 
 // --- Tab Bar ---
 constexpr int TAB_COUNT      = 5;
-constexpr int TAB_W          = SCREEN_W / TAB_COUNT;
-constexpr int TAB_BADGE_W = 26;
-constexpr int TAB_BADGE_H = 20;
 
 // --- Spacing (base unit: 4px) ---
 constexpr int SP_1 = 4;

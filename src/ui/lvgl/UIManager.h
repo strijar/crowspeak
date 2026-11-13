@@ -15,6 +15,9 @@ public:
     virtual void refreshUI() {}
     virtual void onEnter() {}
     virtual void onExit() {}
+    // Hiding a retained tab must not tear down its widget tree.
+    virtual void onHide() {}
+    virtual void onShow() { refreshUI(); }
     virtual bool handleKey(const KeyEvent& event) { return false; }
     virtual bool handleLongPress() { return false; }
     virtual const char* title() const = 0;
@@ -36,6 +39,9 @@ public:
 
     // Screen management
     void setScreen(LvScreen* screen);
+    void registerTab(int tab, LvScreen* screen);
+    void registerTabChild(int tab, LvScreen* screen);
+    void selectTab(int tab);
     LvScreen* getScreen() { return _currentLvScreen; }
 
     // Component access
@@ -70,5 +76,19 @@ private:
     LvScreen* _currentLvScreen = nullptr;
     lv_obj_t* _lvContent = nullptr;
 
+    struct RetainedScreen {
+        LvScreen* screen = nullptr;
+        lv_obj_t* root = nullptr;
+        lv_group_t* group = nullptr;
+        int tab = -1;
+        bool stale = false;
+    };
+    RetainedScreen _retained[LvTabBar::TAB_COUNT + 1]{};
+    LvScreen* _tabSelected[LvTabBar::TAB_COUNT]{};
+    lv_group_t* _transientGroup = nullptr;
+    RetainedScreen* retained(LvScreen* screen);
+    void release(RetainedScreen& slot);
+    void activate(RetainedScreen& slot);
+    void logMemory(const char* action, const char* title, unsigned long elapsed);
     bool _bootMode = false;
 };

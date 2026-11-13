@@ -9,6 +9,16 @@
 
 using namespace handheld::propagation;
 
+void LvSettingsScreen::onHide() {
+    clearConfirmations();
+    onExit();
+}
+
+void LvSettingsScreen::onShow() {
+    _viewActive = true;
+    refreshUI();
+}
+
 void LvSettingsScreen::onExit() {
     _viewActive = false;
     ++_fwViewGeneration;

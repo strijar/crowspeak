@@ -79,7 +79,7 @@ void LvMessageView::loadRrcDraft() {
             const auto length=handheld::ui::rrc_input::textPrefix(_rrcInsert,strlen(_rrcInsert),handheld::rrc::DraftCapacity-_inputText.size());
             _inputText.append(_rrcInsert,length);memset(_rrcInsert,0,sizeof _rrcInsert);composerEdited();
         }
-        if (_screen) {updateComposerText();updateComposerState();}
+        if (_entered && _screen) {updateComposerText();updateComposerState();}
     });
     if (!id) {_rrcLoading=false;_rrcRetryAt=millis()+1000;}
 }
@@ -143,7 +143,7 @@ void LvMessageView::pollRrc() {
             _rrcUncertain=status.sending==handheld::rrc::SendPhase::Unconfirmed;
             rrcNotice(confirmed?status.sending==handheld::rrc::SendPhase::Confirmed?"Confirmed by hub":"Transmitted; no recipient receipt":
                 _rrcUncertain?"Unconfirmed; draft kept":"Not sent; draft kept");
-            if (_screen) {updateComposerText();updateComposerState();}
+            if (_entered && _screen) {updateComposerText();updateComposerState();}
         }
         _rrcSendId=0;
     }

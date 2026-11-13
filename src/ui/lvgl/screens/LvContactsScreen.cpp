@@ -132,6 +132,7 @@ void LvContactsScreen::refreshUI() {
 void LvContactsScreen::rebuildList() {
     if (!_am || !_list) return;
     _lastRebuild = millis();
+    const auto scroll = lv_obj_get_scroll_y(_list);
     std::string focusedHex;
     auto* focused = lv_group_get_focused(LvInput::group());
     if (focused && lv_obj_get_parent(focused) == _list) {
@@ -280,6 +281,8 @@ void LvContactsScreen::rebuildList() {
     }
 
     if (restoredFocus) LvInput::focusObj(restoredFocus);
+    lv_obj_update_layout(_list);
+    lv_obj_scroll_to_y(_list, scroll, LV_ANIM_OFF);
 
 #if HAS_TOUCH
     // Trackball/touch boards defer visible focus until the user navigates.
