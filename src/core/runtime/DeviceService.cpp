@@ -9,7 +9,6 @@
 #include "history/RrcCatalog.h"
 #include "protocol/RrcPreferences.h"
 #include "TaskOwner.h"
-#if !defined(RSCARDPUTER)
 #include "util/Bytes.h"
 #include "config/Timezones.h"
 #include "storage/MessageRecord.h"
@@ -881,4 +880,3 @@ void DeviceService::runLifecycle(uint8_t slot) {
 }
 
 } // namespace handheld
-#endif

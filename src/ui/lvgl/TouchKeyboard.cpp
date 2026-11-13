@@ -1,5 +1,4 @@
 #include "TouchKeyboard.h"
-#ifdef RSCROWPANEL
 #include "KeyboardLayouts.h"
 #include "input/Utf8.h"
 #include "fonts/fonts.h"
@@ -175,4 +174,3 @@ void attach(lv_obj_t* root) {
  for(uint32_t i=0;i<n;++i) attach(lv_obj_get_child(root,i));
 }
 }
-#endif

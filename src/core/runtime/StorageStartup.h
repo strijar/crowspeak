@@ -1,7 +1,5 @@
 #pragma once
-#ifdef RSCROWPANEL
 #include "input/RecoveryInput.h"
-#endif
 
 #include "storage/FlashStore.h"
 
@@ -13,11 +11,7 @@ namespace handheld {
 // the boot that follows runs with storage, radio and SD in their normal order.
 template<class Keyboard, class Display, class Restart>
 void storageStartup(FlashStore& flash, Keyboard& hardwareKeyboard, Display& display, Restart restart) {
-#ifdef RSCROWPANEL
     crowpanel::RecoveryInput<Display> keyboard(display);
-#else
-    auto& keyboard=hardwareKeyboard;
-#endif
     using Startup = FlashStore::Startup;
     Startup state = flash.startup();
     if (state == Startup::Ready) return;

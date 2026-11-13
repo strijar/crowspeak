@@ -118,7 +118,6 @@ void LvSettingsScreen::activatePropagationRow(int row) {
         else if (row >= 2 && size_t(row - 2) < _propCount) savePropagationAddress(_propNodes[row - 2].address);
     } else if (_view == SettingsView::PROPAGATION_ENTRY) {
         if (row == 0) { showPropagationDialog(SettingsView::PROPAGATION_CHOICE); return; }
-#ifdef RSCROWPANEL
         if(row==2) {
             TouchKeyboard::show("Propagation node address",_propInput,32,[this](const std::string& value) {
                 Settings parsed;
@@ -129,7 +128,6 @@ void LvSettingsScreen::activatePropagationRow(int row) {
             });
             return;
         }
-#endif
         Settings parsed;
         if (strlen(_propInput) != 32 || !parsed.setManual(_propInput, 32)) {
             if (_ui) _ui->lvStatusBar().showToast("Enter 32 hexadecimal characters", 2000);
@@ -206,11 +204,7 @@ void LvSettingsScreen::rebuildPropagationDialog() {
     } else if (_view == SettingsView::PROPAGATION_ENTRY) {
         row("< Back", nullptr, 0);
         row("Node address", "32 hexadecimal characters", -1);
-#ifdef RSCROWPANEL
         _editValueLbl = row(_propInput[0] ? _propInput : "Tap to enter address", nullptr, 2);
-#else
-        _editValueLbl = row(_propInput[0] ? _propInput : "_", nullptr, -1);
-#endif
         lv_obj_set_style_text_font(_editValueLbl, &lv_font_rsdeck_10, 0);
         row("Save address", "The node can be offline when saved", 1);
     } else {

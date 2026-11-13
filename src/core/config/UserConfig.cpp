@@ -345,11 +345,11 @@ bool UserConfig::parseJson(const char* json, size_t length, bool persisted, bool
         parsed.fullBatteryV = doc["full_battery_v"] | BATTERY_FULL_VOLTAGE_DEFAULT;
 
         parsed.gpsTimeEnabled     = doc["gps_time"]     | true;
-    #if LEGACY_GPS_LOC_MIGRATION
+#if LEGACY_GPS_LOC_MIGRATION
         parsed.gpsLocationEnabled = doc["gps_location"].isNull()
             ? (doc["gps_loc"] | false)
             : (doc["gps_location"] | false);
-    #else
+#else
         parsed.gpsLocationEnabled = doc["gps_location"] | false;
     #endif
         const int timezoneIdx = doc["tz_idx"] | 6;

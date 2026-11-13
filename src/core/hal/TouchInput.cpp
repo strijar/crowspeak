@@ -54,7 +54,6 @@ bool TouchInput::readGT911() {
     uint8_t touchCount = status & 0x0F;
     bool bufferReady = (status & 0x80) != 0;
 
-#ifdef RSCROWPANEL
     // Polling faster than GT911 produces no new frame, not a release. Holding
     // the state avoids repeated clicks; a stalled controller expires it.
     if (!bufferReady) {
@@ -62,7 +61,6 @@ bool TouchInput::readGT911() {
         return _touched;
     }
     _lastSampleMs=millis();
-#endif
     if (!bufferReady || touchCount == 0) {
         _touched = false;
         Wire.beginTransmission(_i2cAddress);
@@ -89,24 +87,10 @@ bool TouchInput::readGT911() {
     }
 
     uint8_t trackId = Wire.read();
-#if defined(RSCROWPANEL)
     _x = Wire.read(); _x |= Wire.read() << 8;
     _y = Wire.read(); _y |= Wire.read() << 8;
     Wire.read(); Wire.read();
     _touched = true;
-#else
-    _y = Wire.read() | (Wire.read() << 8);
-    _x = Wire.read() | (Wire.read() << 8);
-    Wire.read() | (Wire.read() << 8); // size (unused)
-
-    _y = TFT_HEIGHT - 1 - _y;
-    _touched = true;
-
-    // Remap touchpad coordinates to display bounds
-    _x = (_x - TOUCH_X_MIN) * (TFT_WIDTH - 1) / (TOUCH_X_MAX - TOUCH_X_MIN);
-    _y = (_y - TOUCH_Y_MIN) * (TFT_HEIGHT - 1) / (TOUCH_Y_MAX - TOUCH_Y_MIN);
-
-#endif
     if (_x < 0) _x = 0;
     if (_x >= TFT_WIDTH) _x = TFT_WIDTH - 1;
     if (_y < 0) _y = 0;

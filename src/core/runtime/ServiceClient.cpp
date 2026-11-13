@@ -1,7 +1,6 @@
 #include "ServiceClient.h"
 #include "storage/MessageRecord.h"
 #include <freertos/FreeRTOS.h>
-#if !defined(RSCARDPUTER)
 #include <cstring>
 
 namespace handheld {
@@ -418,4 +417,3 @@ uint32_t ServiceClient::lifecycle(Operation operation, const std::string& identi
 }
 
 } // namespace handheld
-#endif

@@ -20,11 +20,7 @@ namespace handheld::voice {
 namespace {
 constexpr uint32_t StackBytes=24576, DriverAllowance=8192, StackReserve=6144, PcmBytes=640;
 constexpr uint8_t MemoProfile=0x10; // LXST ULBW selects native 700C; LXMF audio mode remains 0x03.
-#ifdef RSCARDPUTER
-constexpr size_t FreeFloor=ResourceBudget::CardInternalFree, LargestFloor=ResourceBudget::CardLargestBlock;
-#else
 constexpr size_t FreeFloor=ResourceBudget::LargeInternalFree, LargestFloor=ResourceBudget::LargeLargestBlock;
-#endif
 portMUX_TYPE memoryMux=portMUX_INITIALIZER_UNLOCKED;
 VoiceWorker::MemoryStatus memoryReport;
 Code memoryFailure(VoiceWorker::MemoryStage stage,size_t requiredFree,size_t requiredBlock) {
@@ -69,11 +65,7 @@ struct VoiceWorker::Impl {
         // The notification owner has now stopped its task and DMA. Admission
         // accounts for the already allocated worker stack, then reserves the
         // actual active-direction driver without double-counting notifications.
-#ifdef RSCARDPUTER
-        const uint32_t caps=MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT;
-#else
         const uint32_t caps=(use==AudioUse::Call?MALLOC_CAP_SPIRAM:MALLOC_CAP_INTERNAL)|MALLOC_CAP_8BIT;
-#endif
         const auto bytes=rs_handheld_voice_codec_size();
         const size_t memoBytes=use==AudioUse::MemoRecord?size_t(frameLimit)*4:0;
         const auto retained=bytes+PcmBytes+memoBytes;
@@ -117,11 +109,7 @@ VoiceWorker::MemoryStatus VoiceWorker::memoryStatus() {
 }
 void VoiceWorker::keepInputAlive() { _inputHeartbeat=uint32_t(nowMs()); }
 uint8_t VoiceWorker::capabilities() const {
-#if defined(RSDECK) || defined(RATPAGER) || defined(RSCARDPUTER)
-    return 3;
-#else
     return 0;
-#endif
 }
 Code VoiceWorker::prepare(uint32_t generation,uint8_t profile,uint8_t volumeValue) {
     return prepareUse(generation,profile,volumeValue,AudioUse::Call,0,0);

@@ -7,13 +7,13 @@ import configparser
 import re
 from pathlib import Path
 
-from release_catalog import BOARDS, check_rnode_partition_producers
+from release_catalog import BOARDS
 from release_identity import SOURCE_VARIABLES, check_local
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = re.compile(r"^[0-9a-f]{40}$")
-IGNORED_PARTS = {".git", ".pio", ".venv", "build", "dist", "target"}
+IGNORED_PARTS = {".git", ".pio", ".venv", "build", "dist", "target", ".platformio-core", ".agents", ".codex", ".aws"}
 
 
 def fail(message: str) -> None:
@@ -77,6 +77,8 @@ def main() -> int:
     allowed_markdown = {
         Path("CONTRIBUTORS.md"),
         Path("README.md"),
+        Path("docs/crowpanel.md"),
+        Path("docs/sdk.md"),
         Path("SECURITY.md"),
         Path("THIRD_PARTY_NOTICES.md"),
     }
@@ -108,8 +110,6 @@ def main() -> int:
         fail("all catalog boards must build complete release packages")
     if "make package DEVICE=${{ matrix.device }}" not in package:
         fail("release board matrix must build all advertised modes")
-    if "experimental-cardputer" in workflow:
-        fail("Cardputer must qualify in the complete release matrix")
     if "pattern: '*-dist'" not in preparation or "merge-multiple: true" not in preparation:
         fail("candidate must collect board artifacts for exact inventory verification")
     if "contents: write" in workflow or "gh release" in workflow or "gh pr" in workflow:
@@ -126,7 +126,7 @@ def main() -> int:
         if "persist-credentials: false" not in step:
             fail("checkout must discard credentials before building source")
 
-    for ini_name in ("platformio.ini", "launcher/platformio.ini"):
+    for ini_name in ("platformio.ini",):
         ini = (ROOT / ini_name).read_text(encoding="utf-8")
         if re.search(r"@\s*[~^<>=*]", ini):
             fail(f"non-exact dependency constraint in {ini_name}")
@@ -150,12 +150,6 @@ def main() -> int:
 
     if "pre:tools/check_build_identity.py" not in config["common"]["extra_scripts"]:
         fail("normal builds must check the generated product version")
-
-    rnode = (ROOT / "vendor/rnode_firmware/Makefile").read_text(encoding="utf-8")
-    check_rnode_partition_producers(ROOT)
-    for spec in re.findall(r'arduino-cli lib install "([^"]+)"', rnode):
-        if "@" not in spec:
-            fail(f"unpinned Arduino library: {spec}")
 
     for board in BOARDS:
         config = (ROOT / f"src/boards/{board}/config/BoardConfig.h").read_text(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that launcher, Standalone, and RNode app images fit their OTA slots."""
+"""Check the CrowPanel application identity and OTA slot size."""
 
 from __future__ import annotations
 
@@ -20,25 +20,14 @@ def image_size(path: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", required=True, choices=BOARDS)
-    parser.add_argument("--launcher", type=Path)
     parser.add_argument("--standalone", required=True, type=Path)
-    parser.add_argument("--rnode", type=Path)
     args = parser.parse_args()
 
     failed = False
     revision, dirty = source_identity(ROOT)
     version = firmware_version(ROOT)
     board = BOARDS[args.device]
-    if "full" in board.modes:
-        if args.launcher is None or args.rnode is None:
-            parser.error("dual-boot boards require --launcher and --rnode")
-        partitions = board.partitions()
-        checks = [(name, getattr(args, name), partitions[name].size)
-                  for name in ("launcher", *APPLICATIONS)]
-    else:
-        if args.launcher is not None or args.rnode is not None:
-            parser.error("this board supports only --standalone")
-        checks = [("standalone", args.standalone, board.partitions(standalone=True)["app0"].size)]
+    checks = [("standalone", args.standalone, board.partitions(standalone=True)["app0"].size)]
 
     for name, path, slot_size in checks:
         size = image_size(path)

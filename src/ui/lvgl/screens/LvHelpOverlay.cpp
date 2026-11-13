@@ -66,7 +66,6 @@ void LvHelpOverlay::create() {
     makeLabel(header, "Ratspeak.org", &lv_font_rsdeck_10,
               Theme::TEXT_SECONDARY, 180, LV_TEXT_ALIGN_RIGHT);
 
-#if defined(RSCROWPANEL)
     addHelpRow(_overlay, "Tap field", "Open text keyboard");
     addHelpRow(_overlay, "Lang", "Switch EN / RU layout");
     addHelpRow(_overlay, "Shift / 123", "Case / numbers and symbols");
@@ -75,46 +74,9 @@ void LvHelpOverlay::create() {
     addHelpRow(_overlay, "SEND", "Send the prepared message");
     addHelpRow(_overlay, "Chat", "Swipe history; hold message");
     addHelpRow(_overlay, "Wake", "Tap once; then tap an action");
-#elif HAS_DPAD
-    addHelpRow(_overlay, "Arrows", "Move selection / edit value");
-    addHelpRow(_overlay, "OK / Enter", "Open or confirm");
-    addHelpRow(_overlay, "Back", "Return / cancel editing");
-    addHelpRow(_overlay, "Left / Right", "Switch tabs outside editors");
-    addHelpRow(_overlay, "Hold Enter", "Context actions / sleep");
-    addHelpRow(_overlay, "Icon keys", "Coming soon");
-    addHelpRow(_overlay, "Chat arrows", "Select a message; OK opens");
-    addHelpRow(_overlay, "Chat Back", "Clear selection first");
-#elif HAS_SCROLLWHEEL
-    addHelpRow(_overlay, "Encoder", "Move selection / edit value");
-    addHelpRow(_overlay, "Click/Enter", "Open or confirm");
-    addHelpRow(_overlay, "Backspace", "Back; then select a tab");
-    addHelpRow(_overlay, "Alt+Back", "Cancel editing (Esc)");
-    addHelpRow(_overlay, "Alt+Q..P", "Type numbers 1..0");
-    addHelpRow(_overlay, "A / D", "Select frequency digit");
-    addHelpRow(_overlay, "Chat wheel", "Select message; click opens");
-    addHelpRow(_overlay, "Below draft", "Wheel to Voice or Send");
-    addHelpRow(_overlay, "Selected", "Click opens; hold for actions");
-    addHelpRow(_overlay, "BOOT", "Tap sleep; hold power off");
-#else
-    addHelpRow(_overlay, "Trackball", "Move selection");
-    addHelpRow(_overlay, "Click/Enter", "Open or confirm");
-    addHelpRow(_overlay, ",  /", "Previous or next tab");
-    addHelpRow(_overlay, "Backspace", "Delete text; back if empty");
-    addHelpRow(_overlay, "Hold click", "Cancel settings / name edit");
-    addHelpRow(_overlay, "Cancel / <", "Tap to cancel or go back");
-    addHelpRow(_overlay, "Chat ball", "Scroll; click selects message");
-    addHelpRow(_overlay, "Selected", "Click opens; hold for actions");
-    addHelpRow(_overlay, "Chat touch", "Swipe history; hold message");
-#endif
 
     lv_obj_t* footer = makeLabel(_overlay,
-#if defined(RSCROWPANEL)
                                  "Tap to close",
-#elif !HAS_TOUCH
-                                 "Any key closes",
-#else
-                                 "Any key or tap closes",
-#endif
                                  &lv_font_rsdeck_10, Theme::TEXT_MUTED,
                                  260, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_pad_top(footer, 2, 0);

@@ -1,5 +1,4 @@
 #include "config/BoardConfig.h"
-#if defined(RSDECK) || defined(RSM9) || defined(RSCROWPANEL)
 #include "hal/Power.h"
 #include "hal/Display.h"
 #include "hal/Keyboard.h"
@@ -128,5 +127,3 @@ void Power::setState(State newState) {
             break;
     }
 }
-
-#endif

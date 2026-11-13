@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
-  ARDUINO_CLI_VERSION: 1.4.1
   # Generated source mirrors: tools/release_identity.py sync
   RNS_LITE_COMMIT: 1af3d84b6452f554dcc2fbaa17e938a20bf79a95
   LXMF_LITE_COMMIT: 48c4071d101cbd43c52e35e36b27ad0a8726f3a5
@@ -143,6 +142,8 @@ jobs:
 
   package:
     name: Package ${{ matrix.device }}
+    env:
+      PLATFORMIO_CORE_DIR: ${{ github.workspace }}/source/ratspeak-handheld/.platformio-core
     needs: release-config
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -159,26 +160,18 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-      - name: Resolve device toolchain
-        id: board
-        working-directory: source/ratspeak-handheld
-        env:
-          DEVICE: ${{ matrix.device }}
-        run: |
-          python3 -c 'import os, sys; sys.path.insert(0, "tools"); from release_catalog import BOARDS; print("rnode=" + str("rnode" in BOARDS[os.environ["DEVICE"]].modes).lower())' >> "$GITHUB_OUTPUT"
-      - name: Install Arduino CLI
-        if: steps.board.outputs.rnode == 'true'
-        uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2.0.0
-        with:
-          version: ${{ env.ARDUINO_CLI_VERSION }}
       - name: Install pinned Python tools
         run: python -m pip install platformio==6.1.19 esptool==5.2.0
-      - name: Prepare pinned RNode dependencies
+      - name: Install CrowPanel dependencies
         working-directory: source/ratspeak-handheld
         run: make setup DEVICE=${{ matrix.device }}
       - name: Build release package
         working-directory: source/ratspeak-handheld
         run: make package DEVICE=${{ matrix.device }}
+      - name: Verify CrowPanel package
+        working-directory: source/ratspeak-handheld
+        run: |
+          python tools/check_crowpanel_port.py
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

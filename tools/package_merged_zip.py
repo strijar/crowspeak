@@ -20,7 +20,6 @@ from release_images import flash_settings, verify_factory
 NOTICES = {
     "LICENSE": "LICENSE",
     "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
-    "vendor/rnode_firmware/LICENSE": "licenses/RNode-GPL-3.0.txt",
     "licenses/THIRD-PARTY.txt": "licenses/THIRD-PARTY.txt",
     "licenses/manifest.json": "licenses/manifest.json",
 }

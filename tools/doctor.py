@@ -15,7 +15,7 @@ from release_catalog import BOARDS, ROOT
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", choices=BOARDS, default="tdeck")
+    parser.add_argument("--device", choices=BOARDS, default="crowpanel")
     parser.add_argument(
         "--source",
         action="store_true",
@@ -34,8 +34,6 @@ def main() -> int:
             failures.append(f"missing {label}: {path}")
 
     require_command("python3")
-    if "rnode" in BOARDS[args.device].modes:
-        require_command("arduino-cli")
     for module in ("platformio", "esptool"):
         result = subprocess.run(
             [sys.executable, "-c", f"import {module}"],
@@ -55,8 +53,9 @@ def main() -> int:
         ROOT / "protocol/include/ratspeak_protocol.h",
         "Rust C ABI header",
     )
-    if "rnode" in BOARDS[args.device].modes:
-        require_file(ROOT / "vendor/rnode_firmware/Makefile", "vendored RNode build")
+
+    from check_crowpanel_sdk import verify
+    verify()
 
     if args.source:
         require_command("cargo")

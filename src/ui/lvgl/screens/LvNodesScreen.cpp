@@ -190,9 +190,7 @@ void LvNodesScreen::createUI(lv_obj_t* parent) {
     _overlay = lv_obj_create(lv_layer_top());
     lv_obj_set_size(_overlay, 260, 158);
     lv_obj_set_pos(_overlay, (Theme::SCREEN_W - 260) / 2, Theme::STATUS_BAR_H + (Theme::CONTENT_H - 158) / 2);
-    #ifdef RSCROWPANEL
     lv_obj_set_size(_overlay,420,260);lv_obj_center(_overlay);
-#endif
     lv_obj_add_style(_overlay, LvTheme::styleModal(), 0);
     lv_obj_set_style_pad_all(_overlay, 0, 0);
     lv_obj_clear_flag(_overlay, LV_OBJ_FLAG_SCROLLABLE);
@@ -224,9 +222,7 @@ void LvNodesScreen::createUI(lv_obj_t* parent) {
         lv_obj_t* btn = lv_obj_create(_overlay);
         lv_obj_set_size(btn, 236, 24);
         lv_obj_set_pos(btn, 12, 63 + i * 27);
-#ifdef RSCROWPANEL
         lv_obj_set_size(btn,396,48);lv_obj_set_pos(btn,12,90+i*52);
-#endif
         lv_obj_set_style_bg_color(btn, lv_color_hex(Theme::BG_SURFACE), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(btn, lv_color_hex(Theme::BORDER), 0);
@@ -270,12 +266,10 @@ void LvNodesScreen::createUI(lv_obj_t* parent) {
     lv_label_set_text(nickTitle, "Contact name");
     lv_obj_set_pos(nickTitle, 0, 0);
 
-#ifdef RSCROWPANEL
     lv_obj_add_flag(_nicknameBox,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_nicknameBox,[](lv_event_t* e) {
         static_cast<LvNodesScreen*>(lv_event_get_user_data(e))->showNicknameInput();
     },LV_EVENT_CLICKED,this);
-#endif
     _nicknameLbl = lv_label_create(_nicknameBox);
     lv_obj_set_style_text_font(_nicknameLbl, &lv_font_rsdeck_14, 0);
     lv_obj_set_style_text_color(_nicknameLbl, lv_color_hex(Theme::PRIMARY), 0);
@@ -515,13 +509,11 @@ void LvNodesScreen::showNicknameInput() {
     for (int i = 0; i < 3; i++) lv_obj_add_flag(_menuBtns[i], LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(_nicknameBox, LV_OBJ_FLAG_HIDDEN);
     updateNicknameDisplay();
-#ifdef RSCROWPANEL
     TouchKeyboard::show("Contact name",_nicknameText.c_str(),16,[this](const std::string& value) {
         _nicknameText=value.c_str();updateNicknameDisplay();
         KeyEvent enter{};enter.enter=true;handleKey(enter);
         return true;
     });
-#endif
 }
 
 void LvNodesScreen::updateMenuSelection() {

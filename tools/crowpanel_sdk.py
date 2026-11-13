@@ -25,6 +25,8 @@ print(f"CrowPanel SDK: {sdk}; QIO flash / OPI PSRAM 120 MHz; bootloader: {boot.n
 # Preserve the application's scan/cancellation contract on the new SDK.
 import sys
 sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "tools"))
+from check_crowpanel_sdk import verify
+verify(sdk)
 from patch_crowpanel_wifi import SOURCE_FILES, patched_source
 sources = {name: (framework / "libraries/WiFi/src" / name).resolve() for name in SOURCE_FILES}
 outputs = {name: Path(env.subst("$BUILD_DIR")).resolve() / "sdk-backports" / name for name in sources}

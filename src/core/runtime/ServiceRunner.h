@@ -1,6 +1,5 @@
 #pragma once
 
-#if !defined(RSCARDPUTER)
 #include "DeviceService.h"
 
 #ifndef DEVICE_SERVICE_TASK
@@ -21,4 +20,3 @@ private:
     bool _started = false;
 };
 } // namespace handheld
-#endif

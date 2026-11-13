@@ -21,7 +21,6 @@ from release_catalog import BOARDS, ROOT
 
 IDENTITY_PATH = Path("tools/release_identity.json")
 HEADER_PATH = Path("src/core/config/FirmwareVersion.h")
-RNODE_HEADER_PATH = Path("vendor/rnode_firmware/RatspeakBuildIdentity.h")
 WORKFLOW_PATH = Path(".github/workflows/build.yml")
 SOURCE_VARIABLES = {
     "rsReticulumLite": "RNS_LITE_COMMIT",
@@ -111,15 +110,13 @@ def check_workflow_pins(text: str, variables: dict[str, str]) -> None:
 
 def check_local(root: Path = ROOT) -> None:
     firmware_version(root)
-    if (root / RNODE_HEADER_PATH).read_text() != version_header(root):
-        raise ValueError("generated RNode build identity is stale; run tools/release_identity.py sync")
     check_workflow_pins((root / WORKFLOW_PATH).read_text(),
                         {SOURCE_VARIABLES[name]: ref for name, ref in source_pins(root).items()})
 
 
 def sync(root: Path = ROOT) -> None:
     """Generate local mirrors only; never invent pins or update sibling lineage."""
-    for relative in (HEADER_PATH, RNODE_HEADER_PATH):
+    for relative in (HEADER_PATH,):
         header = root / relative
         header.parent.mkdir(parents=True, exist_ok=True)
         header.write_text(version_header(root))

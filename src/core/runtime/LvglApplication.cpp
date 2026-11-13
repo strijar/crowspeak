@@ -1,6 +1,5 @@
 #include "transport/WiFiVersion.h"
 #include "config/BoardConfig.h"
-#if defined(RSDECK) || defined(RSM9) || defined(RSCROWPANEL)
 #include "runtime/LvglApplication.h"
 #include "LvMemory.h"
 #include "runtime/FactoryResetRecovery.h"
@@ -22,9 +21,6 @@
 
 #include "config/BoardConfig.h"
 #include "config/Config.h"
-#if defined(RSDECK)
-#include "platform/RsDeckModeSwitch.h"
-#endif
 #include "hal/Display.h"
 #include "hal/TouchInput.h"
 #if HAS_TRACKBALL
@@ -32,9 +28,6 @@
 #endif
 #include "hal/Keyboard.h"
 #include "hal/Power.h"
-#if defined(RSM9)
-#include "hal/GnssPower.h"
-#endif
 #if HAS_GPS
 #include "hal/GPSManager.h"
 #endif
@@ -105,14 +98,10 @@ SET_LOOP_TASK_STACK_SIZE(16384);
 // Do NOT use SPI2_HOST (IDF constant = 1) — Arduino treats index 1 as HSPI/SPI3!
 SPIClass sharedSPI(FSPI);
 
-#if defined(RSM9)
-BoardRadio radio(&sharedSPI);
-#else
 BoardRadio radio(&sharedSPI,
     LORA_CS, SPI_SCK, SPI_MOSI, SPI_MISO,
     LORA_RST, LORA_IRQ, LORA_BUSY, LORA_RXEN,
     LORA_HAS_TCXO, LORA_DIO2_AS_RF_SWITCH);
-#endif
 
 Display display;
 TouchInput touch;
@@ -424,11 +413,11 @@ void handheld::lvgl_application::setup() {
     const unsigned long setupStartMs = millis();
     bool flashMounted = false;
 
-    // Step 1: Power pin — CRITICAL: enables all T-Deck Plus peripherals
+    // Step 1: Board peripheral power
     Power::enablePeripherals();
 
     // Step 2: Serial
-#if (ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE) || defined(RSM9)
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
     // Fit an entire semantic reply plus ordinary logs before any writer starts.
     // HWCDC's default 256-byte queue forces large replies through its lossy
     // disconnected fallback or blocking drain path.
@@ -440,7 +429,7 @@ void handheld::lvgl_application::setup() {
 #endif
 #endif
     Serial.begin(SERIAL_BAUD);
-#if (ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE) || defined(RSM9)
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
     if (!remoteUiTxReady) {
         remoteUi.close();
         Serial.println("[SERIAL] Serial UI unavailable: TX queue allocation failed");
@@ -476,13 +465,6 @@ void handheld::lvgl_application::setup() {
     bootTraceStage("serial-online");
 
     // Dual-boot layout: re-arm the launcher so the next reset shows the chooser.
-#if defined(RSDECK)
-    auto launcherBoot = rs_deck::returnToLauncherNextBoot();
-    if (!launcherBoot.ok) {
-        Serial.printf("[BOOT] Launcher return unavailable: %s\n", launcherBoot.message);
-    }
-    bootTraceStage("launcher-return");
-#endif
     if (!psramFound() || heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) < 1024 * 1024) {
         Serial.printf("[BOOT] FATAL: PSRAM unavailable or too fragmented (largest=%lu)\n",
                       (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
@@ -550,7 +532,6 @@ void handheld::lvgl_application::setup() {
 #endif
     bootTraceStage("sd-probe");
 
-#if !defined(RSM9)
     // Verify radio SPI still works after SD init
     if (radioOnline) {
         uint8_t sw_msb = radio.readRegister(0x0740);
@@ -558,7 +539,6 @@ void handheld::lvgl_application::setup() {
         Serial.printf("[BOOT] Radio SPI pre-display: syncword=0x%02X%02X %s\n",
             sw_msb, sw_lsb, (sw_msb == 0xFF && sw_lsb == 0xFF) ? "DEAD!" : "OK");
     }
-#endif
 
     // Step 5: Display HAL — LovyanGFX + ST7789V
     // LovyanGFX's Bus_SPI::init() calls spi_bus_initialize() which will
@@ -584,7 +564,6 @@ void handheld::lvgl_application::setup() {
     Serial.println("[BOOT] LVGL initialized");
     bootTraceStage("lvgl-init");
 
-#if !defined(RSM9)
     // Verify radio SPI survives display init
     if (radioOnline) {
         uint8_t sw_msb = radio.readRegister(0x0740);
@@ -592,7 +571,6 @@ void handheld::lvgl_application::setup() {
         Serial.printf("[BOOT] Radio SPI post-display: syncword=0x%02X%02X %s\n",
             sw_msb, sw_lsb, (sw_msb == 0xFF && sw_lsb == 0xFF) ? "DEAD!" : "OK");
     }
-#endif
 
     // Step 6: UI manager (initializes both legacy and LVGL UI layers)
     ::ui.begin();
@@ -625,12 +603,9 @@ void handheld::lvgl_application::setup() {
     trackball.begin();
     inputManager.begin(&keyboard, &trackball, &touch);
     LvInput::init(&keyboard, &trackball, &touch);
-#elif defined(RSCROWPANEL)
+#else
     inputManager.begin(&keyboard, &touch);
     LvInput::init(&keyboard, &touch);
-#else
-    inputManager.begin(&keyboard);
-    LvInput::init(&keyboard);
 #endif
     inputManager.setPowerMgr(&powerMgr);
 
@@ -854,11 +829,6 @@ void handheld::lvgl_application::setup() {
     // Step 24.5: GPS init
 #if HAS_GPS
     deviceDiagnostics.extraDump = []() { gps.printDiagnostics(); };
-#if defined(RSM9)
-    gps.setPowerControl([](bool enabled) {
-        return m9::setGnssPower(keyboard.revision(), enabled);
-    });
-#endif
     gps.setTimeEnabled(userConfig.settings().gpsTimeEnabled);
     if (userConfig.settings().gpsTimeEnabled || userConfig.settings().gpsLocationEnabled) {
         lvBootScreen.setProgress(0.93f, "Starting GPS...");
@@ -1203,13 +1173,11 @@ void handheld::lvgl_application::setup() {
         }, false)) lvTimezoneScreen.setSaving(false);
     });
 
-#ifdef RSCROWPANEL
     TouchKeyboard::configure(serviceClient.config.settings().touchKeyboardLayout,[](uint8_t index) {
         if(serviceClient.settingsPending()) return false;
         serviceClient.config.settings().touchKeyboardLayout=index;
         return serviceClient.applySettings({},false);
     });
-#endif
     // Name input screen (first boot only — when no display name is set)
     lvNameInputScreen.setDoneCallback([showTimezone](const String& name) {
         if (serviceClient.settingsPending()) return;
@@ -1398,15 +1366,6 @@ static void serviceNetworkPoll() {
         if (!saved) Serial.println("[BOOT] Boot success counter save failed");
     }
 #if HAS_GPS
-#if defined(RSM9)
-    // A keyboard-controller startup timeout must not permanently disable GNSS.
-    // Revision becomes available atomically after UI-side discovery recovers;
-    // only the device owner initializes the receiver and starts its UART.
-    if (!gps.isRunning() && keyboard.revision() &&
-        (userConfig.settings().gpsTimeEnabled || userConfig.settings().gpsLocationEnabled)) {
-        gps.begin();
-    }
-#endif
     if (gps.isRunning()) gps.loop();
 #endif
     if (backend->pollRadioBeforeBlockingWork()) deviceDiagnostics.poll();
@@ -1602,5 +1561,3 @@ void handheld::lvgl_application::loop() {
     if (remotePending) finishRemoteUi(remoteRequest, remoteWokeOnly);
     yield();
 }
-
-#endif

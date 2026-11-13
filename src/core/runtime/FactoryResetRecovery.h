@@ -1,7 +1,5 @@
 #pragma once
-#ifdef RSCROWPANEL
 #include "input/RecoveryInput.h"
-#endif
 
 #include "FactoryReset.h"
 #include "storage/FlashStore.h"
@@ -17,11 +15,7 @@ namespace handheld {
 template<class Keyboard, class Display, class Restart>
 void factoryResetRecovery(FlashStore& flash, SDStore& sd, Keyboard& hardwareKeyboard,
                           Display& display, Restart restart) {
-#ifdef RSCROWPANEL
     crowpanel::RecoveryInput<Display> keyboard(display);
-#else
-    auto& keyboard=hardwareKeyboard;
-#endif
     if (flash.resetState() == FlashStore::ResetState::Clear) return;
     bool confirm = false, paint = true, scopeKnown = false, includesSD = false;
     const char* detail = "Reset interrupted or unavailable";

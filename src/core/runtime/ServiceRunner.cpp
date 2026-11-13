@@ -1,5 +1,4 @@
 #include "ServiceRunner.h"
-#if !defined(RSCARDPUTER)
 namespace handheld {
 bool ServiceRunner::start() {
     _started = true;
@@ -25,4 +24,3 @@ void ServiceRunner::task(void* context) {
     }
 }
 } // namespace handheld
-#endif

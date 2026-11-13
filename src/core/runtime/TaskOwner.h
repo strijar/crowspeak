@@ -1,5 +1,4 @@
 #pragma once
-#if !defined(RSCARDPUTER)
 #include <atomic>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -11,6 +10,3 @@ inline void assertDeviceOwner() {
     configASSERT(!owner || owner == xTaskGetCurrentTaskHandle());
 }
 }
-#else
-namespace handheld { inline void assertDeviceOwner() {} }
-#endif

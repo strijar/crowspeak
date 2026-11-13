@@ -48,9 +48,7 @@ void DeviceDiagnostics::printDiagnostics() {
                       (unsigned long)radio.getSignalBandwidth(),
                       radio.getCodingRate4(),
                       radio.getTxPower());
-#if !defined(RSM9)
         Serial.printf("Regulator: %s\n", LORA_USE_DCDC_REGULATOR ? "DC-DC" : "LDO");
-#endif
         Serial.printf("Preamble: %ld symbols\n", radio.getPreambleLength());
         Serial.printf("Bitrate: %lu bps  LDRO: %s  frame255: %.0f ms\n",
                       (unsigned long)radio.getBitrate(),
@@ -66,9 +64,6 @@ void DeviceDiagnostics::printDiagnostics() {
                           loraIf->airtimeUtilization() * 100.0f);
         }
         Serial.printf("IQ invert: %s\n", radio.getInvertIQ() ? "ON" : "off");
-#if defined(RSM9)
-        radio.printDiagnostics();
-#else
         Serial.printf("SyncWord regs: 0x%02X%02X\n",
             radio.readRegister(REG_SYNC_WORD_MSB_6X),
             radio.readRegister(REG_SYNC_WORD_LSB_6X));
@@ -91,7 +86,6 @@ void DeviceDiagnostics::printDiagnostics() {
         Serial.printf("Packet type: 0x%02X (%s)%s\n",
                       packetType, packetTypeName,
                       packetType == 0x01 ? "" : " *** NOT LoRa ***");
-#endif
     }
     Serial.printf("Free heap: %lu bytes  PSRAM: %lu bytes\n",
                   (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getFreePsram());
@@ -577,14 +571,6 @@ void DeviceDiagnostics::pollResults() {
     if (remoteUi && remoteUi->result(readyData, readyLength)) {
         bool connected = true;
         size_t available = diagnostics::RemoteUiReplyDelivery::TxCapacity;
-#if (defined(RSDECK) && ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE) || defined(RSM9)
-        // Admit whole replies to the bounded HWCDC/UART transmit queue.
-        // On HWCDC this also lets IN_EMPTY establish the connection and
-        // avoids its offline FIFO path silently discarding the reply.
-        connected = static_cast<bool>(Serial);
-        const int writable = connected ? Serial.availableForWrite() : 0;
-        available = writable > 0 ? static_cast<size_t>(writable) : 0;
-#endif
         remoteUiDelivery.poll(*remoteUi, static_cast<uint32_t>(millis()), connected, available,
             [](const char* data, size_t length) {
                 // One mutex-protected write preserves framing beside logs.

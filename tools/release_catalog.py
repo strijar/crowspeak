@@ -13,8 +13,8 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("full", "standalone", "rnode")
-APPLICATIONS = ("standalone", "rnode")
+PACKAGES = ("standalone",)
+APPLICATIONS = ("standalone",)
 
 
 @dataclass(frozen=True)
@@ -66,8 +66,7 @@ class Board:
         if path is None:
             raise ValueError("this board supports only the standalone layout")
         entries = read_partitions(root / path, self.capacity)
-        roles = (("app0", "ota_0"), ("app1", "ota_1")) if standalone else (
-            ("launcher", "ota_0"), ("standalone", "ota_1"), ("rnode", "ota_2"))
+        roles = (("app0", "ota_0"), ("app1", "ota_1"))
         for name, subtype in roles:
             entry = entries.get(name)
             if entry is None or (entry.kind, entry.subtype) != ("app", subtype):
@@ -79,12 +78,6 @@ class Board:
             raise ValueError(f"unsupported factory application: {mode}")
         if mode == "standalone":
             return self.partitions(root, standalone=True)["app0"].offset
-        if mode == "rnode":
-            entries = read_partitions(root / self.rnode_partition_csv, self.capacity)
-            app = entries.get("app0")
-            if app is None or (app.kind, app.subtype) != ("app", "ota_0"):
-                raise ValueError("RNode factory layout requires app0/ota_0")
-            return app.offset
         raise ValueError(f"unsupported factory application: {mode}")
 
 
@@ -218,25 +211,6 @@ def site_contract() -> dict:
     }}
 
 
-def check_rnode_partition_producers(root: Path = ROOT) -> None:
-    """Check the source producer; binary partition correspondence is a later gate."""
-    makefile = (root / "vendor/rnode_firmware/Makefile").read_text()
-    for name, board in BOARDS.items():
-        if "rnode" not in board.modes:
-            continue
-        variable = board.rnode_target.upper() + "_FQBN"
-        match = re.search(rf"^{variable}\s*:=\s*(\S+)\s*$", makefile, re.MULTILINE)
-        if not match:
-            raise ValueError(f"{name}: missing explicit RNode FQBN producer {variable}")
-        fqbn = match.group(1).split(":", 3)
-        if len(fqbn) != 4 or fqbn[:3] != ["esp32", "esp32", "esp32s3"]:
-            raise ValueError(f"{name}: RNode producer must target ESP32-S3")
-        options = dict(item.split("=", 1) for item in fqbn[3].split(","))
-        if (options.get("FlashSize") != board.flash_size.removesuffix("B") or
-                options.get("PartitionScheme") != board.rnode_partition_scheme):
-            raise ValueError(f"{name}: RNode flash/partition producer differs from the catalog")
-
-
 def firmware_assets() -> set[str]:
     return set().union(*(board_assets(board) for board in BOARDS.values()))
 
@@ -252,18 +226,6 @@ def make_settings(device: str) -> dict[str, str]:
         "STANDALONE_FACTORY_OFFSET": hex(board.factory_app_offset("standalone")),
         "STANDALONE_FACTORY_SLOT_SIZE": hex(board.partitions(standalone=True)["app0"].size),
     }
-    if "full" in board.modes:
-        partitions = board.partitions()
-        settings.update({
-            "PARTITION_CSV": board.partition_csv,
-            "PARTITIONS_BASENAME": f"partitions-{board.flash_size.lower()}.bin",
-            "RNODE_TARGET": board.rnode_target,
-            "RNODE_PREP_TARGET": board.rnode_prep_target,
-            "RNODE_FACTORY_OFFSET": hex(board.factory_app_offset("rnode")),
-        })
-        for name in ("launcher", *APPLICATIONS):
-            settings[f"{name.upper()}_SLOT_SIZE"] = hex(partitions[name].size)
-            settings[f"{name.upper()}_OFFSET"] = hex(partitions[name].offset)
     return settings
 
 
@@ -287,7 +249,6 @@ def main() -> int:
             if "full" in board.modes:
                 board.partitions()
             board.partitions(standalone=True)
-        check_rnode_partition_producers()
         print(f"release catalog: PASS ({len(BOARDS)} boards, {len(firmware_assets())} firmware assets)")
     return 0
 

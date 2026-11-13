@@ -21,17 +21,10 @@ constexpr int TextX = 54;
 constexpr int NavigationHeight = 30;
 constexpr int NavigationSpace = NavigationHeight + 6;
 constexpr int FamilyHeight = handheld::ui::RrcEnabled ? 24 : 0;
-#ifdef RSCROWPANEL
 constexpr int RowHeight = 88;
 constexpr int PreviewY = 33;
 constexpr int StatusBottom = 24;
 constexpr int TimeWidth = 76;
-#else
-constexpr int RowHeight = (Theme::CONTENT_H - FamilyHeight - NavigationSpace) / 2;
-constexpr int PreviewY = 22;
-constexpr int StatusBottom = 16;
-constexpr int TimeWidth = 43;
-#endif
 void peerText(const uint8_t* peer, char (&out)[33]) {
     constexpr char hex[] = "0123456789abcdef";
     for (size_t i=0;i<16;++i) { out[2*i]=hex[peer[i]>>4]; out[2*i+1]=hex[peer[i]&15]; }

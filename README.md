@@ -1,179 +1,53 @@
-<div align="center">
+# Crowspeak — CrowPanel Reticulum/LXMF messenger
 
-# [Ratspeak Handheld](https://ratspeak.org/)
+Firmware for **Elecrow CrowPanel Advance 5-inch V1.2/V1.3**, with the SX1262
+expansion module, RGB display and RU/EN touch keyboard. Storage uses internal
+flash; Wi-Fi is available and disabled by default.
 
-**Standalone messaging and RNode firmware for Reticulum handhelds.**
+This project supports CrowPanel only. CrowPanel Advance 3.5-inch is planned;
+its SDK is compatible with the bundled SDK, but its display and peripheral
+configuration are not implemented or tested yet.
 
-[![Status](https://img.shields.io/badge/status-beta-yellow.svg)](#devices)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
+## Build
 
-[Ratspeak](https://github.com/ratspeak/Ratspeak) |
-[Docs](https://docs.ratspeak.org/docs/hardware/handheld-guide) |
-[Downloads](https://github.com/ratspeak/ratspeak-handheld/releases)
+Install Make and Python 3.12, then run:
 
-</div>
-
----
-
-Send encrypted LXMF messages over LoRa or WiFi, directly from your handheld.
-No account or phone required. Keep contacts, discover peers, and carry your
-conversations with you. LoRa messaging works without an internet connection.
-
-This codebase supports T-Deck, T-Pager, Cardputer, ThinkNode M9 and
-CrowPanel Advance 5-inch devices. The protocol core uses rsReticulumLite and
-rsLXMFLite, with device support built around the same messaging services.
-
-## Devices
-
-| Device | Support |
-| --- | --- |
-| LilyGO T-Deck Plus | Standalone and RNode |
-| LilyGO T-Pager (SX1262) | Standalone and RNode |
-| M5Stack Cardputer Adv | Standalone and RNode; Cap LoRa-1262 required for LoRa |
-| Elecrow ThinkNode M9 | Standalone; RNode coming soon |
-| Elecrow CrowPanel Advance 5-inch V1.2/V1.3 + SX1262 | Standalone; display, touch, SX1262 messaging and Wi-Fi tested on hardware |
-
-CrowPanel support targets **V1.2/V1.3 with the Elecrow SX1262 module**. It has an
-English interface and an RU/EN touch keyboard, with optional additional layouts.
-It uses internal flash storage; SD, voice, RNode and launcher modes are disabled.
-See the [CrowPanel build and flashing guide](docs/crowpanel.md) for its required
-Elecrow 120 MHz SDK. CrowPanel images are built from this checkout; the upstream
-release and web-flasher links below are not a distribution path for this port.
-
-An SD card is optional for normal messaging on the other devices.
-
-This is beta firmware. If something isn't working, open an issue with your
-device, firmware version, and the steps to reproduce it.
-
-## Install
-
-For the upstream handheld targets, download the ZIP for your device from [Releases](https://github.com/ratspeak/ratspeak-handheld/releases):
-
-- **Full** — Standalone and RNode, with a launcher to choose between them at startup.
-- **Standalone** — the on-device messenger, using LoRa or WiFi.
-- **RNode** — use the handheld as a radio for Ratspeak, Sideband, or another
-  Reticulum client over USB or BLE.
-
-Files are named by device and mode, such as `tdeck-full.zip`,
-`pager-standalone.zip` and `cardputer-rnode.bin`. Standalone and RNode are also
-published as a `.bin`: the same complete image as in the ZIP.
-
-- **Web flasher:** open the [Ratspeak web flasher](https://ratspeak.org/download.html),
-  select your device, and choose **Flash in browser**. To install a downloaded
-  ZIP, choose **Flash** under **Build your own** and upload it. Compatible
-  updates keep identity, messages and settings.
-- **esptool:** write the `.bin` at 0x0, for example
-  `python3 -m esptool --chip esp32s3 --port PORT --baud 115200 write-flash 0x0 m9-standalone.bin`.
-- **bmorcelli's Launcher:** install the Standalone or RNode `.bin` from the SD
-  card or through Launcher's web interface.
-
-Factory installs with the web flasher or esptool replace the firmware layout, so
-back up your identity and messages first. See the
-[installation guide](https://docs.ratspeak.org/docs/hardware/flashing-firmware)
-for backups, updates and Launcher storage, and the [handheld guide](https://docs.ratspeak.org/docs/hardware/handheld-guide)
-for controls and setup.
-
-CrowPanel build instructions, the required 120 MHz SDK, and touch keyboard details
-are in [the CrowPanel guide](docs/crowpanel.md).
-
-## Message history
-
-Internal storage keeps the newest messages. When it runs low, the oldest
-messages are removed across all conversations; messages still being sent and
-drafts are kept. To keep the full history, use an SD card for messages: turn on
-**Settings → Storage → SD Message Store**; Cardputer uses an inserted card
-automatically. **Settings → Storage** shows internal usage and whether history
-is complete on the card or rolling. CrowPanel uses internal storage only.
-
-## Voice messages
-
-T-Deck, T-Pager, and Cardputer Adv can record and play voice messages up to
-15 seconds long. Open **Voice message** in a conversation, record your clip,
-then preview and send it. Sending returns to the conversation with inline
-playback and delivery status. ThinkNode M9 has no supported audio hardware;
-voice support is disabled in the CrowPanel target.
-
-On Pager, move the wheel down from the composer to reach Voice and Send, then
-click to select. Cardputer also opens the recorder with **Ctrl+V**.
-
-Unsent clips are removed when you close the conversation. **Settings → Voice**
-controls playback volume and **Max voice messages** (1–50, default 2) for
-internal storage. Oldest audio is removed first; the message stays in chat.
-SD-card audio is limited by available storage instead of the clip count.
-
-Announce from the handheld before recording to it in the Ratspeak app so the
-app can choose a compatible compact recording. Existing Opus clips cannot be
-played on these handhelds. Live handheld calls and Hub/channel access are not
-available in this release.
-
-New or reset radio settings use **Medium Fast**. Existing saved presets are
-retained; match the radio settings on devices that communicate directly.
-
-Follow your local radio regulations for frequency, transmit power and duty
-cycle. Region and link presets do not limit power or airtime for your region.
-
-## Propagation
-
-In **Settings → Propagation**, turn propagation ON to use an LXMF propagation
-node for store-and-forward messaging. It is OFF by default.
-
-- **Node mode AUTO** selects a usable discovered node, preferring WiFi/TCP when
-  available. The device keeps up to five candidates for each connection family.
-- **Node mode MANUAL** offers address entry or a discovered-node list. The chosen
-  address stays pinned while offline and survives AUTO, OFF and restarts. Use
-  **Choose / replace node** or **Clear manual node** to change it.
-- **Delivery AUTO** tries direct delivery first and falls back after a network
-  failure. **ALWAYS** sends through the selected node on every connection. If
-  that node is unreachable, the message reports **PROP UNAVAILABLE**.
-- **Sync now** retrieves your inbox. Automatic checks run about every five
-  minutes on WiFi/TCP or thirty minutes on LoRa, with a small random delay.
-
-**PROPAGATED** means the relay accepted the transfer; it does not mean the
-recipient has received the message. Messages created with ALWAYS retain that
-policy even if settings change. Turning propagation OFF pauses pending relay
-work. Downloaded messages are saved locally before the node is asked to delete
-them.
-
-Handheld memory and work limits apply. Stamp costs above 20 are refused, and a
-stamp job stops after 30 seconds. An inbox reply that exceeds the supported
-Resource size or uses compression reports **REPLY UNSUPPORTED** and leaves
-messages on the node.
-
-## Build From Source
-
-On Linux or macOS, install Git, Make, Python 3.12 and Arduino CLI 1.4.1, then:
-
-```bash
-git clone https://github.com/ratspeak/ratspeak-handheld
-cd ratspeak-handheld
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r requirements-build.txt
-make setup DEVICE=tdeck
-make doctor DEVICE=tdeck
-make package DEVICE=tdeck
-```
-
-Use `DEVICE=tpager`, `DEVICE=cardputer` or `DEVICE=m9` for the other devices. Packages
-are written to `dist/`. Normal builds use the included Rust libraries; a Rust
-toolchain is not required.
-
-M9 builds Standalone only and does not require Arduino CLI.
-
-For **CrowPanel**, follow [docs/crowpanel.md](docs/crowpanel.md) first to install
-Elecrow's SDK next to the project and create the Python 3.12 environment. Then:
-
-```bash
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements-build.txt
 export PLATFORMIO_CORE_DIR="$PWD/.platformio-core"
-make package DEVICE=crowpanel PYTHON=.venv/bin/python
+make package
 ```
 
-CrowPanel uses Arduino ESP32 3.0.2 through PlatformIO and builds Standalone only.
-Arduino CLI and a Rust toolchain are not required. The output is
-`dist/crowpanel-standalone.bin`, a complete image for address **0x0**.
+Make automatically uses `.venv/bin/python` and the project-local `.platformio-core`.
+Explicit `PYTHON` and `PLATFORMIO_CORE_DIR` overrides remain supported.
 
-## License
+The first build downloads the pinned compiler, Arduino framework and libraries.
+The required Elecrow SDK subset and Rust protocol archive are already included;
+no sibling SDK checkout, Arduino IDE or Rust compiler is required.
 
-GNU Affero General Public License v3.0 or later. See [LICENSE](LICENSE).
-Bundled RNode firmware retains its [GPLv3 license](vendor/rnode_firmware/LICENSE).
-See [Third-party notices](THIRD_PARTY_NOTICES.md).
+Outputs: `dist/crowpanel-standalone.bin` (flash at **0x0**) and
+`dist/crowpanel-standalone.zip` (image, checksums and notices).
+
+```sh
+make flash PORT=/dev/ttyUSB0
+```
+
+See [CrowPanel hardware, setup and testing](docs/crowpanel.md) and
+[SDK inventory and comparison](docs/sdk.md).
+
+## Development
+
+```sh
+make source-check
+.venv/bin/python tools/check_crowpanel_port.py
+```
+
+The image check requires a completed `make package`. Hardware checks cover
+boot, touch alignment, redraws during flash writes and LoRa message exchange.
+Protocol source development additionally requires the pinned sibling Rust
+repositories listed in `tools/release_identity.json`; normal firmware builds
+use `protocol/prebuilt/xtensa-esp32s3/small/libratspeak_protocol.a`.
+
+Derived from Ratspeak Handheld. See [contributors](CONTRIBUTORS.md), [license](LICENSE)
+and [third-party notices](THIRD_PARTY_NOTICES.md).

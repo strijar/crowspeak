@@ -4,8 +4,11 @@
 *.png binary
 *.jpg binary
 *.zip binary
+*.gz binary
 licenses/THIRD-PARTY.txt -text
-merge_firmware.py linguist-vendored
 vendor/** linguist-vendored
 src/ui/lvgl/fonts/*.c linguist-generated
 protocol/prebuilt/** linguist-generated
+
+# Preserve upstream license text bytes, including whitespace.
+licenses/THIRD-PARTY.txt -whitespace

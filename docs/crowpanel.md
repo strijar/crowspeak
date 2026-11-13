@@ -55,13 +55,10 @@ both hardware revisions or every application feature.
 ## Build prerequisites
 
 The commands below are for Linux, run from the root of this firmware checkout
-unless stated otherwise. Use a checkout that contains `[env:crowpanel]` in
-`platformio.ini` (the development branch is `crow_wip`). An upstream firmware
-release or an older checkout may not contain the port.
+unless stated otherwise. This checkout builds CrowPanel Advance only.
 
 Install Git, Make, **Python 3.12** with `venv`/pip, and a working Internet
-connection for the first dependency installation. Host keyboard tests additionally
-need GCC and G++. Arduino CLI, Arduino IDE, an ESP-IDF installation and a Rust
+connection for the first dependency installation. Arduino CLI, Arduino IDE, an ESP-IDF installation and a Rust
 compiler are **not required** for the normal CrowPanel build.
 
 Check Python before creating the environment:
@@ -74,58 +71,14 @@ If it is installed outside `PATH`, use its full path, for example
 `/usr/local/bin/python3.12`. Do not create the environment with another Python
 version and assume that activating it will select 3.12.
 
-### 1. Download Elecrow's SDK
+### Bundled SDK
 
-The SDK comes from the manufacturer's
-[CrowPanel Advance 5-inch repository](https://github.com/Elecrow-RD/CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480).
-The version used for the working build is commit
-[`b2a9e1f5dad2281974c98bba71214ece5c07b706`](https://github.com/Elecrow-RD/CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480/tree/b2a9e1f5dad2281974c98bba71214ece5c07b706),
-folder **`ESP32S3_120M`**. Its package version is **`5.1.4+sha.bd2b9390ef`**.
-This is a package of precompiled SDK libraries and headers, not just a bootloader.
+The required Elecrow SDK subset is included as `vendor/crowpanel-sdk/sdk.tar.gz`.
+PlatformIO installs it automatically from this checkout. No manufacturer repository,
+Arduino IDE or separate ESP-IDF installation is needed. See
+[SDK inventory and comparison](sdk.md) for provenance, reduction and the 3.5-inch comparison.
 
-To download only the SDK working tree, run from the firmware root:
-
-```sh
-git clone --filter=blob:none --no-checkout \
-  https://github.com/Elecrow-RD/CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480.git \
-  ../CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480
-git -C ../CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480 sparse-checkout init --cone
-git -C ../CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480 sparse-checkout set ESP32S3_120M
-git -C ../CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480 checkout b2a9e1f5dad2281974c98bba71214ece5c07b706
-```
-
-If you already have the manufacturer's repository, reuse it after checking the
-SDK version; do not clone over the existing directory. For schematics and sample
-programs, also check out `Datasheet`, `Eagle_SCH&PCB` and `example`.
-
-For a manual download, use the
-[ZIP of the tested commit](https://github.com/Elecrow-RD/CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480/archive/b2a9e1f5dad2281974c98bba71214ece5c07b706.zip).
-Extract it and rename its top-level directory to the exact name below (remove
-the commit suffix). The firmware only needs `ESP32S3_120M`; keep that entire
-folder intact, including `package.json`. The SDK occupies about 227 MiB unpacked;
-the full hardware repository/archive is larger.
-
-Expected layout:
-
-```text
-workspace/
-  ratspeak-handheld/
-    platformio.ini
-  CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480/
-    ESP32S3_120M/
-      package.json
-      esp32s3/
-        bin/bootloader_qio_120m.elf
-        qio_opi/include/sdkconfig.h
-        ...
-```
-
-`platformio.ini` references this sibling folder through a `symlink://` package.
-Do not move or delete it after installation. The verification script also expects
-this layout. Do not copy the manufacturer's example Arduino libraries over this
-project's dependencies.
-
-### 2. Create the build environment
+### 1. Create the build environment
 
 ```sh
 python3.12 -m venv .venv
@@ -136,8 +89,7 @@ export PLATFORMIO_CORE_DIR="$PWD/.platformio-core"
 ```
 
 The Python requirements pin **PlatformIO 6.1.19** and **esptool 5.2.0**.
-The project-local PlatformIO directory avoids mixing CrowPanel's Arduino 3.x
-packages with the Arduino 2.x packages used by the other boards. Set this
+The project-local PlatformIO directory isolates the pinned CrowPanel toolchain. Set this
 variable again in every new shell before building. There is no need to activate
 `.venv` when using the explicit commands above.
 
@@ -148,7 +100,7 @@ versions declared in `platformio.ini`:
 | --- | --- |
 | Platform | [pioarduino 51.03.03 archive](https://github.com/pioarduino/platform-espressif32/releases/download/51.03.03/platform-espressif32.zip) |
 | Arduino ESP32 framework | [3.0.2 archive](https://github.com/espressif/arduino-esp32/releases/download/3.0.2/esp32-3.0.2.zip) |
-| SDK libraries and 120 MHz bootloader | Elecrow `ESP32S3_120M`, downloaded in step 1 |
+| SDK libraries and 120 MHz bootloader | Bundled Elecrow SDK subset |
 | Xtensa ESP32-S3 compiler | GCC 12.2.0, resolved by the platform |
 | Graphics | LovyanGFX 1.1.16 and LVGL 8.3.11 |
 | JSON | ArduinoJson 7.4.3 |
@@ -157,18 +109,17 @@ Use the package installation command rather than manually unpacking archives
 into PlatformIO's package directories. The two linked platform/framework
 archives alone are not a complete offline toolchain. A first build needs access
 to PyPI, GitHub and the PlatformIO package registry. After dependencies are
-installed, retain `.venv`, `.platformio-core`, `.pio/libdeps/crowpanel` and the
-sibling SDK directory for subsequent builds.
+installed, retain `.venv`, `.platformio-core`, `.pio/libdeps/crowpanel` and the installed SDK package for subsequent builds.
 
-### 3. Build and package
+### 2. Build and package
 
 ```sh
 export PLATFORMIO_CORE_DIR="$PWD/.platformio-core"
-make package DEVICE=crowpanel PYTHON=.venv/bin/python
+make package
 .venv/bin/python tools/check_crowpanel_port.py
 ```
 
-Always pass `DEVICE=crowpanel`: the project's default target is T-Deck. The
+CrowPanel is the default and only build target. The
 package target compiles the standalone app, checks its partition size, merges
 the selected Elecrow bootloader and partition table, and produces:
 
@@ -189,7 +140,7 @@ For a clean rebuild of the CrowPanel application:
 
 ```sh
 .venv/bin/python -m platformio run -e crowpanel -t clean
-make package DEVICE=crowpanel PYTHON=.venv/bin/python
+make package
 ```
 
 ### The 120 MHz distinction
@@ -278,11 +229,11 @@ in Settings. Wi-Fi is off by default. For custom LoRa values, unlock
 | Symptom | What to check |
 | --- | --- |
 | `python3.12` not found | Use the installed Python 3.12 executable's full path; recreate `.venv` if it was made with another Python version. |
-| Missing `framework-arduinoespressif32-libs`, SDK headers or bootloader | Check the sibling directory name, extraction depth and full `ESP32S3_120M` contents. |
+| Missing `framework-arduinoespressif32-libs`, SDK headers or bootloader | Run `python tools/check_crowpanel_sdk.py` and reinstall the local package. |
 | Wrong Arduino version, PSRAM speed or Wi-Fi source checksum | Use the pinned framework and manufacturer SDK, set `PLATFORMIO_CORE_DIR`, rerun package installation and clean/rebuild. Do not bypass the checks. |
 | `EAI_AGAIN`, DNS or download errors | Restore network/DNS access to the package hosts, then rerun the failed pip/PlatformIO install command. |
 | Missing compiler, SCons or library package | Rerun `.venv/bin/python -m platformio pkg install -e crowpanel` with the same project-local core directory. |
-| `check_crowpanel_port.py` cannot find build outputs | Run `make package` first; the verifier expects `.platformio-core` and the sibling SDK layout shown above. |
+| `check_crowpanel_port.py` cannot find build outputs | Run `make package` first; the verifier expects `.platformio-core` and the installed bundled SDK. |
 | Image header says 80 MHz | Expected; see the bootloader/SDK distinction above. |
 
 ## Validation after changes
@@ -290,15 +241,10 @@ in Settings. Wi-Fi is off by default. For custom LoRa values, unlock
 Host checks:
 
 ```sh
-.venv/bin/python tools/test_crowpanel_keyboard.py
 .venv/bin/python tools/check_crowpanel_port.py
 .venv/bin/python tools/check_runtime_boundary.py
 .venv/bin/python tools/release_catalog.py check
 ```
-
-The keyboard test compiles the actual LVGL 8 keyboard on the host (requires GCC
-and G++) and exercises Russian glyphs, UTF-8 limits/deletion, language/shift,
-commit/cancel, selection and transitions between editors.
 
 The basic functions listed under Tested status already work on hardware. For a
 new board or after firmware changes, use this regression checklist:
@@ -340,5 +286,4 @@ the CrowPanel dependencies first (they supply `Montserrat-Medium.ttf`), then run
 
 The generator uses Python's `ctypes`; it does not require Pillow or npm.
 `.venv`, `.platformio-core`, `.pio`, `build` and `dist` are local generated
-directories, not source files to commit. The Elecrow SDK stays outside this
-firmware repository.
+directories, not source files to commit. The SDK archive and its checksum inventory are committed to this repository.

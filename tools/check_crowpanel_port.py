@@ -5,14 +5,18 @@ import hashlib
 import json
 import subprocess
 import tempfile
+import os
+import sys
 from release_identity import firmware_version, source_identity
 from release_images import verify_factory
 from patch_crowpanel_wifi import SOURCE_FILES, patched_source
 
 root = Path(__file__).resolve().parents[1]
 build = root / ".pio/build/crowpanel"
-packages = root / ".platformio-core/packages"
-sdk = root.parent / "CrowPanel-Advance-5-HMI-ESP32-S3-AI-Powered-IPS-Touch-Screen-800x480/ESP32S3_120M"
+packages = Path(os.environ.get("PLATFORMIO_CORE_DIR", root / ".platformio-core")) / "packages"
+sdk = packages / "framework-arduinoespressif32-libs"
+from check_crowpanel_sdk import verify
+verify(sdk)
 framework = packages / "framework-arduinoespressif32"
 if json.loads((framework / "package.json").read_text())["version"] != "3.0.2":
     raise SystemExit("Expected Arduino 3.0.2 in the isolated .platformio-core")
@@ -37,7 +41,7 @@ for name in ("handheld_wifi_scan_busy", "handheld_wifi_scan_cancel", "handheld_w
 # SCons selection check. The 80 MHz ROM header is intentional (Arduino qio120).
 with tempfile.TemporaryDirectory(prefix="crowpanel-boot-") as temp:
     boot = Path(temp) / "boot.bin"
-    subprocess.run([str(root / ".venv/bin/python"), str(packages / "tool-esptoolpy/esptool.py"),
+    subprocess.run([sys.executable, str(packages / "tool-esptoolpy/esptool.py"),
                     "--chip", "esp32s3", "elf2image", "--flash_mode", "dio", "--flash_freq", "80m",
                     "--flash_size", "16MB", "-o", str(boot),
                     str(sdk / "esp32s3/bin/bootloader_qio_120m.elf")],

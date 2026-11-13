@@ -19,17 +19,10 @@
 
 namespace {
 
-#ifdef RSCROWPANEL
 constexpr int kHeaderH = 56;
 constexpr int kInputH = 56;
 constexpr int kComposerButtonW = 88;
 constexpr int kComposerHeight = 46;
-#else
-constexpr int kHeaderH = 36;
-constexpr int kInputH = 31;
-constexpr int kComposerButtonW = 44;
-constexpr int kComposerHeight = 23;
-#endif
 constexpr int kBubbleMaxW = Theme::CONTENT_W * 3 / 4;
 constexpr const char* kComposerPlaceholder = "Message...";
 
@@ -301,9 +294,6 @@ void LvMessageView::updateComposerText() {
 #if HAS_SCROLLWHEEL
     if (!_composerAction) display += "_";
 #else
-#ifndef RSCROWPANEL
-    display += "_";
-#endif
 #endif
     lv_textarea_set_text(_textarea, display.c_str());
     lv_textarea_set_cursor_pos(_textarea, LV_TEXTAREA_CURSOR_LAST);
@@ -461,14 +451,12 @@ void LvMessageView::createUI(lv_obj_t* parent) {
     lv_obj_add_event_cb(_textarea, [](lv_event_t* e) {
         auto* self = (LvMessageView*)lv_event_get_user_data(e);
         lv_event_code_t code = lv_event_get_code(e);
-#ifdef RSCROWPANEL
         if(code == LV_EVENT_READY) {
             const auto capacity=self->_rrcMode?handheld::rrc::DraftCapacity:MAX_COMPOSER_CHARS;
             self->_inputText=handheld::utf8::prefix(lv_textarea_get_text(self->_textarea),capacity);
             self->composerEdited();self->updateComposerState();self->updateComposerText();
             return;
         }
-#endif
         if (code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED || code == LV_EVENT_PRESSED) {
             self->dismissSelection();
             self->refreshComposerPlaceholder();

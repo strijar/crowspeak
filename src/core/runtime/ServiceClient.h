@@ -1,6 +1,5 @@
 #pragma once
 
-#if !defined(RSCARDPUTER)
 #include "ServiceMailbox.h"
 #include "history/HistoryWindow.h"
 #include "history/ConversationWindow.h"
@@ -174,4 +173,3 @@ private:
 };
 
 } // namespace handheld
-#endif

@@ -1,492 +1,31 @@
 #!/usr/bin/env python3
-"""Collect release notices; check the committed bundle without build dependencies."""
+"""Verify the committed CrowPanel notice inventory offline.
 
-from __future__ import annotations
-
+Dependency upgrades require reviewing and updating the inventory and notice
+texts together. Firmware packaging consumes this bundle without SDK sources.
+"""
 import argparse
-import configparser
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
-import sys
-import tarfile
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-import urllib.error
-import urllib.parse
-import urllib.request
-import zipfile
-
-from release_identity import load_identity, source_pins
-from release_catalog import ALL_BOARDS
+import tomllib
+from release_identity import source_pins
 
 ROOT = Path(__file__).resolve().parents[1]
-ALL = list(ALL_BOARDS)
-MODES = ["standalone", "launcher", "rnode"]
-LICENSE_NAME = re.compile(r"^(?:licen[cs]e|copying|copyright|notice|unlicense)(?:[._-].*)?$", re.I)
-IDF_REF = "38eeba213aa695aabfd6d89aa9f5078dbe5a94c3"
-ARDUINO_REFS = {
-    "2.0.16": "54927338eb6ae00a67aba53b7f44747cf2dfd0d2",
-    "2.0.17": "5e19e086c43d0fa5e5a596497ff8f11a0a43f6c2",
-}
-# Source adaptations are build inputs even when no package manager installs them.
-# The pinned digest covers the entire original leading comment, including every
-# redistribution condition and disclaimer; source checks remain offline.
-SX126X_REF = "a10c5dfdf89788c6ac805e9fe98889de44175aa2"
-CODEC2_NOTICES = {'crates/lxst-codec2/NOTICE': 'ff1ada84455bc83cd13a4313624a47661f367758784447842604f7c4b595a53c', 'crates/lxst-codec2/licenses/LGPL-2.1.txt': '9ebb6f82b7380a62ac74c5f0322c88e6744dedf2ebe1f54d6f088282b39844bf', 'crates/lxst-codec2/licenses/KISS-FFT-BSD-3-Clause.txt': '49eea0111dfb7038dc18f74034cc517690395ebac8f7768f999133b16e4bf064', 'crates/lxst-codec2/licenses/upstream-Cargo.toml': '939e2818dcb2945f52eceb71b37b512bf1796da53a05e0a69276d5a2e55f9eed', 'crates/lxst-codec2/licenses/upstream-README.md': '76fee2b7d3455903f4246e7412ac230a856f58b098861c4c4c9dbdecd371f94a'}
-SOURCE_NOTICES = {
-    'src/boards/tdeck/audio/es7210/es7210.cpp': {'name': 'LilyGO ES7210: es7210.cpp', 'commit': '1dddf6e0d3aaa74cd4e10ba02938865b99682391', 'source': 'https://github.com/Xinyuan-LilyGO/T-Deck/blob/1dddf6e0d3aaa74cd4e10ba02938865b99682391/lib/es7210/src/es7210.cpp', 'license': 'LicenseRef-Espressif-MIT-products', 'boards': ['tdeck'], 'modes': ['standalone'], 'notice_sha256': '7e8f718cf80a385c3fc60f659ce78b41b21b64be5f5162c03ee851a9dd1513b4'},
-    'src/boards/tdeck/audio/es7210/es7210.h': {'name': 'LilyGO ES7210: es7210.h', 'commit': '1dddf6e0d3aaa74cd4e10ba02938865b99682391', 'source': 'https://github.com/Xinyuan-LilyGO/T-Deck/blob/1dddf6e0d3aaa74cd4e10ba02938865b99682391/lib/es7210/src/es7210.h', 'license': 'LicenseRef-Espressif-MIT-products', 'boards': ['tdeck'], 'modes': ['standalone'], 'notice_sha256': '7e8f718cf80a385c3fc60f659ce78b41b21b64be5f5162c03ee851a9dd1513b4'},
-    'src/boards/tdeck/audio/es7210/audio_hal.h': {'name': 'LilyGO ES7210: audio_hal.h', 'commit': '1dddf6e0d3aaa74cd4e10ba02938865b99682391', 'source': 'https://github.com/Xinyuan-LilyGO/T-Deck/blob/1dddf6e0d3aaa74cd4e10ba02938865b99682391/lib/es7210/src/audio_hal.h', 'license': 'LicenseRef-Espressif-MIT-products', 'boards': ['tdeck'], 'modes': ['standalone'], 'notice_sha256': '2e86ebadf356336e30aa02dc9b77d38a5e3a251958577549b1d4bae50dc5fd35'},
-
-    "vendor/esp_idf_compat/mbedtls/ssl_tls.c": {
-        "name": "Mbed TLS Finished backport: ssl_tls.c",
-        "commit": "2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9",
-        "source": "https://github.com/espressif/mbedtls/blob/2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9/library/ssl_tls.c",
-        "license": "Apache-2.0 OR GPL-2.0-or-later",
-        "comment_style": "blocks",
-        "boards": ["tdeck", "tpager", "m9"],
-        "modes": ["standalone"],
-        "notice_sha256": "3205a23232dc38923b2527f347790e8f51e488e183f4deb6c2bdbe9b8decdaf7",
-    },
-    "vendor/esp_idf_compat/mbedtls/ssl_internal.h": {
-        "name": "Mbed TLS Finished backport: ssl_internal.h",
-        "commit": "2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9",
-        "source": "https://github.com/espressif/mbedtls/blob/2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9/include/mbedtls/ssl_internal.h",
-        "license": "Apache-2.0 OR GPL-2.0-or-later",
-        "comment_style": "blocks",
-        "boards": ["tdeck", "tpager", "m9"],
-        "modes": ["standalone"],
-        "notice_sha256": "643036cd01ff4766604d196abe0d9229915b4057914a74e3db076e0f0fa3bddc",
-    },
-    "vendor/esp_idf_compat/mbedtls/common.h": {
-        "name": "Mbed TLS Finished backport: common.h",
-        "commit": "2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9",
-        "source": "https://github.com/espressif/mbedtls/blob/2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9/library/common.h",
-        "license": "Apache-2.0 OR GPL-2.0-or-later",
-        "comment_style": "blocks",
-        "boards": ["tdeck", "tpager", "m9"],
-        "modes": ["standalone"],
-        "notice_sha256": "86f8dde32af25c28c2e8f18bd22ae2e0dbde09e2b8422b1248ad13de8018622c",
-    },
-    **{
-        f"vendor/esp_idf_compat/{filename}": {
-            "name": f"ESP-IDF ESP32-S3 {filename} deep-sleep backport",
-            "commit": IDF_REF,
-            "source": f"https://github.com/espressif/esp-idf/blob/{IDF_REF}/components/esp_hw_support/port/esp32s3/{filename}",
-            "license": "Apache-2.0",
-            "modes": list(MODES),
-            "notice_sha256": "8be51682fb2bd4252353d136213f81c153a5658ecddefb68f0bc84bfa9a8a249",
-        }
-        for filename in ("rtc_init.c", "rtc_sleep.c")
-    },
-    "vendor/esp_idf_compat/dhcpserver.c": {
-        "name": "ESP-IDF DHCP bounds backport",
-        "commit": IDF_REF,
-        "source": f"https://github.com/espressif/esp-idf/blob/{IDF_REF}/components/lwip/apps/dhcpserver/dhcpserver.c",
-        "license": "Apache-2.0",
-        "comment_style": "line",
-        "modes": ["standalone", "rnode"],
-        "notice_sha256": "72bcb80bce6161c3d54240f43880b578608c8ce294436ba4e021d161fe318b5f",
-    },
-    "src/core/radio/SX1262Timing.h": {
-        "name": "Semtech SX126x timing adaptation",
-        "commit": SX126X_REF,
-        "source": f"https://github.com/Lora-net/sx126x_driver/blob/{SX126X_REF}/src/sx126x.c",
-        "license": "BSD-3-Clause-Clear",
-        "notice_sha256": "57a974c57b6f105b9d1fc2198f4576fb0b943c3847fb6e5c83ba7eaa9237043e",
-    },
-}
 
 
-def digest(data: bytes) -> str:
+def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def run(*args: str, cwd: Path = ROOT) -> str:
-    return subprocess.check_output(args, cwd=cwd, text=True).strip()
-
-
-def source_notice_data(path: str, spec: dict) -> bytes:
-    data = (ROOT / path).read_bytes()
-    if spec.get("comment_style") == "line":
-        match = re.match(rb"((?://[^\n]*\n|[ \t]*\n)+)", data)
-        notice = match[1] if match else None
-    elif spec.get("comment_style") == "blocks":
-        match = re.match(rb"((?:\s*/\*.*?\*/)+)", data, re.S)
-        notice = match[1] + b"\n" if match else None
-    else:
-        match = re.match(rb"\s*(/\*.*?\*/)", data, re.S)
-        notice = match[1] + b"\n" if match else None
-    if notice is None or digest(notice) != spec["notice_sha256"]:
-        raise ValueError(f"source adaptation must retain its complete pinned notice: {path}")
-    return notice
-
-
-def source_notice_inputs() -> dict:
-    for path, spec in SOURCE_NOTICES.items():
-        source_notice_data(path, spec)
-    return SOURCE_NOTICES
-
-
-def source_notice_components() -> list[dict]:
-    components = []
-    for path, spec in source_notice_inputs().items():
-        component = {"name": spec["name"], "version": spec["commit"], "source": spec["source"],
-                     "license": spec["license"], "source_files": [path],
-                     "boards": spec.get("boards", list(ALL)), "modes": spec.get("modes", ["standalone"]), "notices": []}
-        Collector.add(component, path + " (header)", source_notice_data(path, spec), spec["source"])
-        components.append(component)
-    return components
-
-
-def input_pins() -> dict:
-    configs = {}
-    for name in ("platformio.ini", "launcher/platformio.ini"):
-        ini = configparser.ConfigParser(interpolation=None)
-        ini.read(ROOT / name)
-        configs[name] = {
-            section: {key: ini[section][key].strip() for key in ("platform", "lib_deps") if key in ini[section]}
-            for section in ini.sections()
-            if any(key in ini[section] for key in ("platform", "lib_deps"))
-        }
-    rnode = (ROOT / "vendor/rnode_firmware/Makefile").read_text()
+def input_pins():
     return {
-        "platformio": configs,
-        "arduino_core": re.search(r"^ARDUINO_ESP_CORE_VER\s*:=\s*(\S+)", rnode, re.M)[1],
-        "arduino_libraries": sorted(set(re.findall(r'arduino-cli lib install "([^"]+)"', rnode))),
-        "cargo_lock_sha256": digest((ROOT / "protocol/Cargo.lock").read_bytes()),
-        "rust_toolchain": load_identity(ROOT)["archive_toolchain"],
-        "lite_commits": source_pins(ROOT, role="firmware"),
-        "source_notices": source_notice_inputs(),
-        "codec2_notices": CODEC2_NOTICES,
-        "collector_sha256": digest(Path(__file__).read_bytes()),
+        'platformio_sha256': digest((ROOT / 'platformio.ini').read_bytes()),
+        'sdk_manifest_sha256': digest((ROOT / 'vendor/crowpanel-sdk/manifest.json').read_bytes()),
+        'cargo_lock_sha256': digest((ROOT / 'protocol/Cargo.lock').read_bytes()),
+        'lite_commits': source_pins(ROOT, role='firmware'),
     }
-
-
-class Collector:
-    def __init__(self, pio: Path, arduino: Path, rust: Path, arduino_data: Path):
-        self.pio = pio
-        self.arduino = arduino
-        self.rust = rust
-        self.arduino_data = arduino_data
-        self.components = []
-
-    def component(self, name, version, source, boards=ALL, modes=MODES, note=""):
-        component = {"name": name, "version": version, "source": source,
-                     "boards": boards, "modes": modes, "notices": []}
-        if note:
-            component["note"] = note
-        self.components.append(component)
-        return component
-
-    @staticmethod
-    def add(component, label, data, source):
-        if not data:
-            raise ValueError(f"empty or truncated notice: {component['name']} / {label}")
-        # Keep the original bytes, including line endings and copyright wording.
-        data.decode("utf-8")
-        component["notices"].append({"path": label, "source": source, "data": data})
-
-    def file(self, component, root, name, *, header=False, source=None):
-        data = (root / name).read_bytes()
-        if header:
-            match = re.match(rb"\s*(/\*.*?\*/)", data, re.S)
-            if not match:
-                raise ValueError(f"missing leading notice: {name}")
-            data = match[1] + b"\n"
-        if source is None:
-            source = component["source"]
-            if "/tree/" in source:
-                source = source.replace("/tree/", "/blob/") + "/" + urllib.parse.quote(name)
-            elif source.startswith("https://crates.io/crates/"):
-                source = source.replace("https://crates.io/crates/", "https://docs.rs/crate/") + "/source/" + name
-        self.add(component, name + (" (header)" if header else ""), data, source)
-
-    def local_notices(self, component, root, *, extras=()):
-        if not root.is_dir():
-            raise FileNotFoundError(f"missing dependency: {component['name']}")
-        paths = sorted(p for p in root.rglob("*")
-                       if p.is_file() and not any(x in p.relative_to(root).parts
-                           for x in (".git", "examples", "tests", "test", "target"))
-                       and (LICENSE_NAME.match(p.name) or p.name == "IPA_Font_License_Agreement_v1.0.txt"))
-        for path in paths:
-            self.file(component, root, path.relative_to(root).as_posix())
-        for name in extras:
-            self.file(component, root, name, header=True)
-
-    def source_notices(self, component, root, *, source_prefix=None):
-        for path in sorted(root.rglob("*")):
-            relative = path.relative_to(root)
-            if not path.is_file() or path.suffix not in (".h", ".hpp", ".c", ".cpp", ".cc"):
-                continue
-            if any(part in (".git", "examples", "tests", "test") for part in relative.parts):
-                continue
-            data = path.read_bytes()
-            for i, match in enumerate(re.finditer(rb"/\*.*?\*/", data, re.S)):
-                block = match[0]
-                if not re.search(rb"copyright|SPDX-FileCopyrightText|public domain", block, re.I):
-                    continue
-                if not re.search(rb"licen[cs]e|permission|redistribution|public domain", block, re.I):
-                    continue
-                label = relative.as_posix() + f" (notice {i + 1})"
-                base = source_prefix or component["source"].replace("/tree/", "/blob/") + "/"
-                line = data[:match.start()].count(b"\n") + 1
-                source = base + relative.as_posix() + f"#L{line}"
-                self.add(component, label, block + b"\n", source)
-
-    def remote(self, component, repo, ref, paths):
-        for path in paths:
-            url = f"https://raw.githubusercontent.com/{repo}/{ref}/{path}"
-            request = urllib.request.Request(url, headers={"User-Agent": "ratspeak-license-collector"})
-            with urllib.request.urlopen(request, timeout=30) as response:
-                data = response.read()
-            self.add(component, path, data, url)
-
-    def mit_permission(self, component):
-        path = next((ROOT / ".pio/libdeps").glob("*/M5Unified/LICENSE"))
-        data = path.read_bytes()
-        data = data[data.index(b"Permission is hereby granted"):]
-        self.add(component, "MIT permission and disclaimer", data,
-            "https://github.com/m5stack/M5Unified/blob/a6256725481f1bc366655fa48cf03b6095e30ad1/LICENSE#L5")
-
-    def pio_library(self, name, version, repo, ref, boards, *, extras=()):
-        candidates = [p for p in (ROOT / ".pio/libdeps").glob(f"*/{name}*") if p.is_dir()]
-        candidates = [p for p in candidates if p.name == name or p.name.startswith(name + "@")]
-        chosen = None
-        for path in sorted(candidates):
-            if len(ref) == 40:
-                if (path / ".git").exists() and run("git", "rev-parse", "HEAD", cwd=path) == ref:
-                    chosen = path
-                    break
-            elif (path / ".piopm").is_file():
-                meta = json.loads((path / ".piopm").read_text())
-                if meta.get("version") == version:
-                    chosen = path
-                    break
-        if chosen is None:
-            raise ValueError(f"missing exact PlatformIO dependency: {name}@{ref}")
-        component = self.component(name, version, f"https://github.com/{repo}/tree/{ref}", boards)
-        self.local_notices(component, chosen, extras=extras)
-        return component, chosen
-
-    def rust_crates(self):
-        lock = tomllib.loads((ROOT / "protocol/Cargo.lock").read_text())
-        metadata = json.loads(run("cargo", "metadata", "--locked", "--offline", "--format-version", "1",
-                                  "--manifest-path", "protocol/Cargo.toml"))
-        packages = {(p["name"], p["version"]): p for p in metadata["packages"]}
-        for dep in lock["package"]:
-            if "source" not in dep:
-                continue
-            package = packages[(dep["name"], dep["version"])]
-            root = Path(package["manifest_path"]).parent
-            # registry/src/<index>/<crate> -> registry/cache/<index>/<crate>.crate
-            archive = root.parents[2] / "cache" / root.parent.name / (root.name + ".crate")
-            if digest(archive.read_bytes()) != dep["checksum"]:
-                raise ValueError(f"registry archive checksum mismatch: {root.name}")
-            component = self.component(dep["name"], dep["version"],
-                f"https://crates.io/crates/{dep['name']}/{dep['version']}", modes=["standalone"],
-                note="Cargo.lock dependency; includes build-time and target-conditional crates.")
-            component["package_sha256"] = dep["checksum"]
-            component["license"] = package.get("license")
-            self.local_notices(component, root)
-            with tarfile.open(archive) as package_archive:
-                for notice in component["notices"]:
-                    original = package_archive.extractfile(root.name + "/" + notice["path"])
-                    if original is None or original.read() != notice["data"]:
-                        raise ValueError(f"registry notice differs from locked archive: {root.name}/{notice['path']}")
-
-    def collect(self):
-        framework = self.pio / "packages/framework-arduinoespressif32"
-        if json.loads((framework / "package.json").read_text())["version"] != "3.20016.0":
-            raise ValueError("PlatformIO Arduino framework version drift")
-        if run("rustc", "+esp", "--version") != input_pins()["rust_toolchain"]:
-            raise ValueError("esp-rs runtime version drift")
-        rnode_core = self.arduino_data / "packages/esp32/hardware/esp32" / input_pins()["arduino_core"]
-        if json.loads((rnode_core / "package.json").read_text())["version"] != "2.0.17":
-            raise ValueError("RNode Arduino framework version drift")
-        self.rust_crates()
-        self.components.extend(source_notice_components())
-        for name, ref in input_pins()["lite_commits"].items():
-            component = self.component(name, ref, f"https://github.com/ratspeak/{name}/tree/{ref}", modes=["standalone"])
-            data = subprocess.check_output(["git", "show", f"{ref}:LICENSE"], cwd=ROOT.parent / name)
-            self.add(component, "LICENSE", data, f"https://github.com/ratspeak/{name}/blob/{ref}/LICENSE")
-        ref = input_pins()["lite_commits"]["rsLXST"]
-        component = self.component("rsLXST native Codec2", ref, f"https://github.com/ratspeak/rsLXST/tree/{ref}/crates/lxst-codec2", modes=["standalone"])
-        component["license"] = "LGPL-2.1-only AND MIT AND BSD-3-Clause"
-        for path, expected in CODEC2_NOTICES.items():
-            data = subprocess.check_output(["git", "show", f"{ref}:{path}"], cwd=ROOT.parent / "rsLXST")
-            if digest(data) != expected:
-                raise ValueError("native Codec2 notice differs from reviewed source: " + path)
-            self.add(component, path, data, f"https://github.com/ratspeak/rsLXST/blob/{ref}/{path}")
-        arduino_json, _ = self.pio_library("ArduinoJson", "7.4.3", "bblanchon/ArduinoJson", "v7.4.3", ALL)
-        arduino_json["modes"] = ["standalone"]
-        graphics, graphics_root = self.pio_library("LovyanGFX", "1.1.16", "lovyan03/LovyanGFX", "1.1.16", ["tdeck", "tpager", "m9"])
-        self.source_notices(graphics, graphics_root)
-        lvgl, lvgl_root = self.pio_library("lvgl", "8.3.11", "lvgl/lvgl", "v8.3.11", ["tdeck", "tpager", "m9"])
-        lvgl["modes"] = ["standalone"]
-        self.file(lvgl, lvgl_root, "src/extra/libs/qrcode/qrcodegen.c", header=True)
-        radio, _ = self.pio_library("RadioLib", "7.7.1", "jgromes/RadioLib",
-            "ef715e1be6643ffb6cc585cde4c33770caf875b1", ["m9"])
-        radio["modes"] = ["standalone"]
-        for name, version, repo, ref in (
-            ("M5GFX", "0.2.19", "m5stack/M5GFX", "53a7184601f3667b030ba141c58b87ce2acfaa2a"),
-            ("M5Unified", "0.2.13", "m5stack/M5Unified", "a6256725481f1bc366655fa48cf03b6095e30ad1"),
-            ("M5Cardputer", "1.1.1", "m5stack/M5Cardputer", "e0232804763d3e42d7e9be90e43cf6e1c9e7565b"),
-            ("IRremote", "4.6.1", "Arduino-IRremote/Arduino-IRremote", "69d36199d606ab56de1f0f990f2b01f416a9cc9f"),
-        ):
-            component, path = self.pio_library(name, version, repo, ref, ["cardputer"])
-            if name == "M5GFX":
-                self.source_notices(component, path)
-            if name == "M5Cardputer":
-                self.file(component, path, "src/M5Cardputer.h", header=True)
-                # This pinned revision has SPDX headers but no root license text.
-                self.mit_permission(component)
-
-        for name, repo, ref, paths in (
-            ("Montserrat", "JulietaUla/Montserrat", "711e8ae6b4fa9d33d8482c9ec4871d906a345344", ["OFL.txt"]),
-            ("Font Awesome 5.9.0", "FortAwesome/Font-Awesome", "ba907eaec40fab01d410c3023a5572b2cb46cea6", ["LICENSE.txt"]),
-        ):
-            component = self.component(name, ref, f"https://github.com/{repo}/tree/{ref}",
-                                       ["tdeck", "tpager", "m9"], ["standalone"],
-                                       "Font notices for generated LVGL fonts, including custom Montserrat glyphs.")
-            self.remote(component, repo, ref, paths)
-            if name == "Montserrat":
-                ofl = component["notices"][0]["data"]
-                ofl = ofl[ofl.index(b"SIL OPEN FONT LICENSE Version 1.1"):]
-            else:
-                self.add(component, "Font file attribution", b"Copyright (c) Font Awesome\nFont Awesome 5.9.0\n",
-                    "https://github.com/lvgl/lvgl/blob/v8.3.11/scripts/built_in_font/FontAwesome5-Solid%2BBrands%2BRegular.woff")
-                self.add(component, "SIL Open Font License 1.1", ofl,
-                    "https://github.com/JulietaUla/Montserrat/blob/711e8ae6b4fa9d33d8482c9ec4871d906a345344/OFL.txt")
-
-        rnode_repos = {
-            "Adafruit BusIO": "adafruit/Adafruit_BusIO", "Adafruit GFX Library": "adafruit/Adafruit-GFX-Library",
-            "Adafruit seesaw Library": "adafruit/Adafruit_Seesaw", "Adafruit SSD1306": "adafruit/Adafruit_SSD1306",
-            "Adafruit SH110X": "adafruit/Adafruit_SH110X", "Adafruit ST7735 and ST7789 Library": "adafruit/Adafruit-ST7735-Library",
-            "Adafruit NeoPixel": "adafruit/Adafruit_NeoPixel", "XPowersLib": "lewisxhe/XPowersLib",
-            "Crypto": "OperatorFoundation/Crypto", "LovyanGFX": "lovyan03/LovyanGFX",
-            "IRremote": "Arduino-IRremote/Arduino-IRremote", "LibSSH-ESP32": "ewpa/LibSSH-ESP32",
-            "M5GFX": "m5stack/M5GFX", "M5Unified": "m5stack/M5Unified", "M5Cardputer": "m5stack/M5Cardputer",
-        }
-        installed = {}
-        index = json.loads((self.arduino_data / "library_index.json").read_text())
-        indexed = {(library["name"], library["version"]): library for library in index["libraries"]}
-        for prop in self.arduino.glob("*/library.properties"):
-            values = dict(line.split("=", 1) for line in prop.read_text().splitlines() if "=" in line and not line.startswith("#"))
-            installed[(values.get("name"), values.get("version"))] = prop.parent
-        for spec in input_pins()["arduino_libraries"]:
-            name, version = spec.rsplit("@", 1)
-            path = installed.get((name, version))
-            if path is None:
-                raise ValueError(f"missing exact Arduino dependency: {spec}")
-            package = indexed[(name, version)]
-            archive = self.arduino_data / "staging/libraries" / package["archiveFileName"]
-            expected_checksum = package["checksum"].removeprefix("SHA-256:")
-            if digest(archive.read_bytes()) != expected_checksum:
-                raise ValueError(f"Arduino registry archive checksum mismatch: {spec}")
-            component = self.component("Arduino: " + name, version,
-                package["url"], modes=["rnode"],
-                note="Pinned RNode build dependency; board-conditional dependencies are included conservatively.")
-            component["source_repository"] = f"https://github.com/{rnode_repos[name]}"
-            component["archive_sha256"] = expected_checksum
-            if name in ("M5GFX", "M5Unified", "M5Cardputer", "IRremote", "LibSSH-ESP32"):
-                component["boards"] = ["cardputer"]
-            elif name == "LovyanGFX":
-                component["boards"] = ["tdeck", "tpager", "m9"]
-            self.local_notices(component, path)
-            with zipfile.ZipFile(archive) as package_archive:
-                for notice in component["notices"]:
-                    candidates = [n for n in package_archive.namelist() if "/" in n and n.split("/", 1)[1] == notice["path"]]
-                    if len(candidates) != 1 or package_archive.read(candidates[0]) != notice["data"]:
-                        raise ValueError(f"Arduino notice differs from registry archive: {spec}/{notice['path']}")
-            if name in ("LovyanGFX", "M5GFX"):
-                self.source_notices(component, path,
-                    source_prefix=f"https://github.com/{rnode_repos[name]}/blob/{version}/")
-            if name == "Adafruit seesaw Library":
-                self.file(component, path, "Adafruit_seesaw.h", header=True)
-                self.file(component, self.arduino / "Adafruit_GFX_Library", "license.txt",
-                    source="https://github.com/adafruit/Adafruit-GFX-Library/blob/1.12.5/license.txt")
-            if name == "Adafruit ST7735 and ST7789 Library":
-                self.file(component, path, "Adafruit_ST77xx.h", header=True)
-                self.mit_permission(component)
-            if name == "M5Cardputer":
-                self.file(component, path, "src/M5Cardputer.h", header=True)
-                self.mit_permission(component)
-
-        for version, ref in ARDUINO_REFS.items():
-            component = self.component("Arduino-ESP32", version,
-                f"https://github.com/espressif/arduino-esp32/tree/{ref}",
-                modes=["rnode"] if version == "2.0.17" else ["standalone", "launcher"])
-            self.remote(component, "espressif/arduino-esp32", ref,
-                        ["LICENSE.md", "cores/esp32/libb64/LICENSE", "libraries/BLE/LICENSE"])
-            if version == "2.0.16":
-                self.file(component, self.pio / "packages/framework-arduinoespressif32", "cores/esp32/Arduino.h", header=True)
-
-        self.sdk()
-        toolchain = self.pio / "packages/toolchain-xtensa-esp32s3"
-        if json.loads((toolchain / "package.json").read_text())["version"] != "8.4.0+2021r2-patch5":
-            raise ValueError("Xtensa GCC runtime version drift")
-        gcc = self.component("Xtensa GCC and newlib runtimes", "8.4.0+2021r2-patch5",
-            "https://github.com/espressif/crosstool-NG/releases/tag/esp-2021r2-patch5",
-            note="Runtime libraries only; toolchain is not redistributed in firmware packages.")
-        for name in ("gcc/COPYING3", "gcc/COPYING3.LIB", "gcc/COPYING.RUNTIME", "newlib/COPYING.NEWLIB", "newlib/COPYING.LIBGLOSS"):
-            self.file(gcc, toolchain / "share/licenses", name)
-        rust = self.component("Rust core, alloc and compiler-builtins", "esp-rs 1.95.0.0",
-            "https://github.com/esp-rs/rust-build/releases/tag/v1.95.0.0", modes=["standalone"],
-            note="Full upstream library notice is retained as a conservative superset of core/alloc use.")
-        self.file(rust, self.rust, "share/doc/rust/COPYRIGHT-library.html")
-        self.file(rust, self.rust, "lib/rustlib/src/rust/library/compiler-builtins/LICENSE.txt")
-        radio = self.component("RNode radio drivers", "vendored",
-            "https://github.com/ratspeak/ratspeak-handheld/tree/main/vendor/rnode_firmware", modes=["rnode"])
-        self.add(radio, "sx126x, sx127x, sx128x copyright", b"Copyright Sandeep Mistry, Mark Qvist and Jacob Eva.\nLicensed under the MIT license.\n",
-                 radio["source"] + "/sx126x.cpp")
-        self.file(radio, ROOT / "vendor/rnode_firmware", "ST7789.h", header=True)
-        # MIT permission/disclaimer text, with the radio copyright retained above.
-        self.mit_permission(radio)
-        for component in self.components:
-            if not component["notices"]:
-                raise ValueError(f"no license text found for {component['name']}")
-        return sorted(self.components, key=lambda x: (x["name"].lower(), x["version"]))
-
-    def sdk(self):
-        sdk = self.component("ESP-IDF SDK", "v4.4.7 (Arduino build)",
-            f"https://github.com/espressif/esp-idf/tree/{IDF_REF}",
-            note="Arduino packages report v4.4.7-dirty. This identifies upstream notice provenance, not an assertion that packaged SDK binaries equal a clean ESP-IDF build.")
-        self.remote(sdk, "espressif/esp-idf", IDF_REF, ["LICENSE", "components/console/argtable3/LICENSE",
-            "components/console/linenoise/LICENSE", "components/freertos/LICENSE.md",
-            "components/newlib/COPYING.NEWLIB", "components/nghttp/COPYING", "components/nghttp/LICENSE",
-            "components/wpa_supplicant/COPYING"])
-        self.file(sdk, self.pio / "packages/framework-arduinoespressif32/tools/sdk/esp32s3",
-                  "include/fatfs/src/ff.h", header=True,
-                  source=f"https://github.com/espressif/esp-idf/blob/{IDF_REF}/components/fatfs/src/ff.h")
-        self.source_notices(sdk, self.pio / "packages/framework-arduinoespressif32/tools/sdk/esp32s3/include",
-            source_prefix=f"https://github.com/espressif/arduino-esp32/blob/{ARDUINO_REFS['2.0.16']}/tools/sdk/esp32s3/include/")
-        for name, repo, ref, paths in (
-            ("lwIP", "espressif/esp-lwip", "a45be9e438f6cf9c54ec150581819c3b95d5af6b", ["COPYING"]),
-            ("mbedTLS", "espressif/mbedtls", "2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9", ["LICENSE"]),
-            ("ESP Wi-Fi binaries", "espressif/esp32-wifi-lib", "f2aae4d44ec7908013066e69d29b9948846c335c", ["LICENSE"]),
-            ("ESP PHY binaries", "espressif/esp-phy-lib", "dcfdccf6cc2fc02d0886624b7998c890d1a19b28", ["LICENSE"]),
-            ("ESP Bluetooth controller", "espressif/esp32c3-bt-lib", "e5c0f7256ecf5b5f8eb28c1793051a6b88f95124", ["LICENSE"]),
-            ("NimBLE", "espressif/esp-nimble", "49d60705f6e085e670b6d425387e75054bf5dffe", ["LICENSE", "NOTICE"]),
-            ("TinyUSB", "espressif/tinyusb", "c4badd394eda18199c0196ed0be1e2d635f0a5f6", ["LICENSE"]),
-            ("SPIFFS", "pellepl/spiffs", "0dbb3f71c5f6fae3747a9d935372773762baf852", ["LICENSE"]),
-            ("nghttp2", "nghttp2/nghttp2", "e2bc59bec9004bca47df961cbbad20664d7e53b2", ["COPYING"]),
-            ("cJSON", "DaveGamble/cJSON", "87d8f0961a01bf09bef98ff89bae9fdec42181ee", ["LICENSE"]),
-            ("libsodium", "jedisct1/libsodium", "4f5e89fa84ce1d178a6765b8b46f2b6f91216677", ["LICENSE"]),
-            ("micro-ecc", "kmackay/micro-ecc", "24c60e243580c7868f4334a1ba3123481fe1aa48", ["LICENSE.txt"]),
-            ("esp_littlefs 1.14.1", "joltwallet/esp_littlefs", "41873c20fb5cdbcf28d7d6cc04e4bcb4a1305317", ["LICENSE"]),
-            ("littlefs", "littlefs-project/littlefs", "f53a0cc961a8acac85f868b431d2f3e58e447ba3", ["LICENSE.md"]),
-            ("protobuf-c", "protobuf-c/protobuf-c", "abc67a11c6db271bedbb9f58be85d6f4e2ea8389", ["LICENSE"]),
-        ):
-            component = self.component("ESP-IDF: " + name, ref, f"https://github.com/{repo}/tree/{ref}",
-                note="Upstream v4.4.7 submodule notice; configuration-dependent components are included conservatively.")
-            self.remote(component, repo, ref, paths)
 
 
 def write_bundle(components, output):
@@ -519,171 +58,51 @@ def write_bundle(components, output):
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
 
-def check_bundle(output=ROOT / "licenses", *, check_inputs=True):
-    manifest = json.loads((output / "manifest.json").read_text())
-    bundle = (output / "THIRD-PARTY.txt").read_bytes()
-    if manifest.get("schema_version") != 1 or (check_inputs and manifest.get("inputs") != input_pins()):
-        raise ValueError("license inventory does not match the pinned build inputs; regenerate and review it")
-    if digest(bundle) != manifest["bundle_sha256"]:
-        raise ValueError("third-party notice bundle checksum mismatch")
-    if not manifest.get("components"):
-        raise ValueError("empty license inventory")
-    identities = [(c["name"], c["version"]) for c in manifest["components"]]
-    if len(identities) != len(set(identities)):
-        raise ValueError("duplicate license component")
-    names = {c["name"] for c in manifest["components"]}
-    required = {"Arduino-ESP32", "ArduinoJson", "LovyanGFX", "lvgl", "M5GFX", "M5Unified", "M5Cardputer",
-                "IRremote", "Montserrat", "Font Awesome 5.9.0", "RNode radio drivers", "ESP-IDF SDK",
-                "Rust core, alloc and compiler-builtins", "Xtensa GCC and newlib runtimes"}
-    required.update("ESP-IDF: " + name for name in ("lwIP", "mbedTLS", "ESP Wi-Fi binaries", "ESP PHY binaries",
-        "ESP Bluetooth controller", "NimBLE", "TinyUSB", "SPIFFS", "nghttp2", "cJSON", "libsodium", "micro-ecc",
-        "esp_littlefs 1.14.1", "littlefs", "protobuf-c"))
-    if not required.issubset(names):
-        raise ValueError("missing non-Rust notices: " + ", ".join(sorted(required - names)))
-    for spec in manifest["inputs"]["arduino_libraries"]:
-        name, version = spec.rsplit("@", 1)
-        if ("Arduino: " + name, version) not in identities:
-            raise ValueError("missing pinned Arduino notices: " + spec)
-    for name, version in manifest["inputs"]["lite_commits"].items():
+def check_bundle(output=ROOT / 'licenses', *, check_inputs=True):
+    manifest = json.loads((output / 'manifest.json').read_text())
+    bundle = (output / 'THIRD-PARTY.txt').read_bytes()
+    if manifest.get('schema_version') != 1 or (check_inputs and manifest['inputs'] != input_pins()):
+        raise ValueError('Notice inventory differs from build inputs; review dependency notices')
+    if digest(bundle) != manifest['bundle_sha256']:
+        raise ValueError('Notice bundle checksum mismatch')
+    components = manifest['components']
+    required = {'Arduino-ESP32', 'ArduinoJson', 'LovyanGFX', 'lvgl',
+                'Elecrow ESP32-S3 120 MHz SDK subset', 'Rust core, alloc and compiler-builtins',
+                'Montserrat', 'Font Awesome 5.9.0'}
+    if not required <= {c['name'] for c in components}:
+        raise ValueError('Missing required dependency notices')
+    identities = [(c['name'], c['version']) for c in components]
+    if len(set(identities)) != len(identities):
+        raise ValueError('Duplicate notice component')
+    for name, version in manifest['inputs']['lite_commits'].items():
         if (name, version) not in identities:
-            raise ValueError("missing pinned Lite source license: " + name)
-        component = next(c for c in manifest["components"] if c["name"] == name)
-        if (component["source"] != f"https://github.com/ratspeak/{name}/tree/{version}"
-                or len(component["notices"]) != 1
-                or component["notices"][0]["path"] != "LICENSE"
-                or component["notices"][0]["source"] != f"https://github.com/ratspeak/{name}/blob/{version}/LICENSE"):
-            raise ValueError("Lite notice source differs from the pinned revision: " + name)
-    codec2 = [c for c in manifest["components"] if c["name"] == "rsLXST native Codec2"]
-    if len(codec2) != 1 or codec2[0]["version"] != manifest["inputs"]["lite_commits"].get("rsLXST"):
-        raise ValueError("missing native Codec2 notices for selected rsLXST")
-    if {n["path"]:n["sha256"] for n in codec2[0]["notices"]} != manifest["inputs"].get("codec2_notices"):
-        raise ValueError("native Codec2 license inventory differs")
-    for version in ARDUINO_REFS:
-        if ("Arduino-ESP32", version) not in identities:
-            raise ValueError("missing Arduino framework license: " + version)
-    for path, spec in manifest["inputs"].get("source_notices", {}).items():
-        matches = [c for c in manifest["components"] if c["name"] == spec["name"]]
-        if len(matches) != 1:
-            raise ValueError(f"missing or duplicate source-adaptation notice: {path}")
-        component = matches[0]
-        if (component["version"] != spec["commit"] or component["source"] != spec["source"]
-                or component.get("license") != spec["license"] or component.get("source_files") != [path]
-                or component["boards"] != spec.get("boards", ALL) or component["modes"] != spec.get("modes", ["standalone"])
-                or len(component["notices"]) != 1):
-            raise ValueError(f"source-adaptation notice identity or scope differs: {path}")
-        notice = component["notices"][0]
-        if (notice["path"] != path + " (header)" or notice["source"] != spec["source"]
-                or notice["sha256"] != spec["notice_sha256"]):
-            raise ValueError(f"source-adaptation distribution notice differs from pinned text: {path}")
-    for component in manifest["components"]:
-        if not component.get("notices"):
-            raise ValueError(f"missing notices for {component['name']}")
-        if not component.get("boards") or set(component["boards"]) - set(ALL):
-            raise ValueError("invalid notice board scope")
-        if not component.get("modes") or set(component["modes"]) - set(MODES):
-            raise ValueError("invalid notice firmware mode scope")
-        for notice in component["notices"]:
-            start, length = notice["offset"], notice["length"]
-            if start < 0 or length <= 0 or start + length > len(bundle) or digest(bundle[start:start + length]) != notice["sha256"]:
-                raise ValueError(f"notice checksum mismatch: {component['name']} / {notice['path']}")
-            if urllib.parse.urlsplit(notice["source"]).scheme != "https":
-                raise ValueError("notice source must use HTTPS")
-    lock = tomllib.loads((ROOT / "protocol/Cargo.lock").read_text())
-    expected = {(p["name"], p["version"], p["checksum"]) for p in lock["package"] if "source" in p}
-    actual = {(c["name"], c["version"], c["package_sha256"]) for c in manifest["components"] if "package_sha256" in c}
+            raise ValueError('Missing pinned protocol notice: ' + name)
+    for c in components:
+        if c['boards'] != ['crowpanel'] or c['modes'] != ['standalone'] or not c['notices']:
+            raise ValueError('Invalid notice scope: ' + c['name'])
+        for n in c['notices']:
+            start, length = n['offset'], n['length']
+            if start < 0 or length <= 0 or start + length > len(bundle) or digest(bundle[start:start+length]) != n['sha256']:
+                raise ValueError('Notice checksum mismatch: ' + c['name'])
+            if not n['source'].startswith('https://'):
+                raise ValueError('Notice source must use HTTPS')
+            # Embedded adaptations must still retain the reviewed notice bytes.
+            for source in c.get('source_files', []):
+                if bundle[start:start+length].strip() not in (ROOT / source).read_bytes():
+                    raise ValueError('Source notice changed: ' + source)
+    lock = tomllib.loads((ROOT / 'protocol/Cargo.lock').read_text())
+    expected = {(p['name'],p['version'],p['checksum']) for p in lock['package'] if 'source' in p}
+    actual = {(c['name'],c['version'],c['package_sha256']) for c in components if 'package_sha256' in c}
     if actual != expected:
-        raise ValueError("license bundle is missing a locked Rust dependency")
-    if re.search(rb"/(?:Users|home)/[^/\s]+/", bundle) or re.search(r"/(?:Users|home)/[^/\s]+/", json.dumps(manifest)):
-        raise ValueError("machine-local path leaked into license bundle")
-    return len(manifest["components"])
+        raise ValueError('Missing locked Rust dependency notice')
+    if re.search(rb'/(?:Users|home)/[^/\s]+/', bundle):
+        raise ValueError('Local path in notice bundle')
+    return len(components)
 
 
-def refresh_lite(output: Path) -> None:
-    """Refresh only Lite notices from selected Git objects, retaining other bytes.
-
-    This narrow, offline operation also refreshes reviewed native Codec2 notices
-    from the selected rsLXST Git object and records the collector revision.
-    Changes to any other dependency/toolchain require a full --refresh instead.
-    """
-    manifest = json.loads((output / "manifest.json").read_text())
-    current = input_pins()
-    previous = manifest["inputs"]
-    for key in set(current) | set(previous):
-        if key not in {"lite_commits", "codec2_notices", "collector_sha256"} and current.get(key) != previous.get(key):
-            raise ValueError(f"{key} changed; a Lite-only notice refresh is insufficient")
-    check_bundle(output, check_inputs=False)
-    bundle = (output / "THIRD-PARTY.txt").read_bytes()
-    components = manifest["components"]
-    for component in components:
-        for notice in component["notices"]:
-            notice["data"] = bundle[notice["offset"]:notice["offset"] + notice["length"]]
-        name = component["name"]
-        if name in current["lite_commits"]:
-            ref = current["lite_commits"][name]
-            component["version"] = ref
-            component["source"] = f"https://github.com/ratspeak/{name}/tree/{ref}"
-            component["notices"] = []
-            data = subprocess.check_output(["git", "show", f"{ref}:LICENSE"], cwd=ROOT.parent / name)
-            Collector.add(component, "LICENSE", data, f"https://github.com/ratspeak/{name}/blob/{ref}/LICENSE")
-        elif name == "rsLXST native Codec2":
-            ref = current["lite_commits"]["rsLXST"]
-            component["version"] = ref
-            component["source"] = f"https://github.com/ratspeak/rsLXST/tree/{ref}/crates/lxst-codec2"
-            component["notices"] = []
-            for path, expected in CODEC2_NOTICES.items():
-                data = subprocess.check_output(["git", "show", f"{ref}:{path}"], cwd=ROOT.parent / "rsLXST")
-                if digest(data) != expected:
-                    raise ValueError("native Codec2 notice differs from reviewed source: " + path)
-                Collector.add(component, path, data, f"https://github.com/ratspeak/rsLXST/blob/{ref}/{path}")
-    write_bundle(components, output)
-    check_bundle(output)
-
-
-def refresh_source_notices(output: Path) -> None:
-    """Refresh declared source adaptations offline without changing other notices."""
-    manifest = json.loads((output / "manifest.json").read_text())
-    current = input_pins()
-    previous = manifest["inputs"]
-    for key in set(current) | set(previous):
-        if key not in {"source_notices", "collector_sha256"} and current.get(key) != previous.get(key):
-            raise ValueError(f"{key} changed; a source-notice-only refresh is insufficient")
-    # Validate the previous inventory against its own declared source adaptations
-    # before adding the newly reviewed ones. All other input groups matched above.
-    check_bundle(output, check_inputs=False)
-    bundle = (output / "THIRD-PARTY.txt").read_bytes()
-    replaced_names = {spec["name"] for spec in previous.get("source_notices", {}).values()}
-    replaced_names.update(spec["name"] for spec in current["source_notices"].values())
-    components = [c for c in manifest["components"] if c["name"] not in replaced_names]
-    for component in components:
-        for notice in component["notices"]:
-            notice["data"] = bundle[notice["offset"]:notice["offset"] + notice["length"]]
-    components.extend(source_notice_components())
-    write_bundle(sorted(components, key=lambda c: (c["name"].lower(), c["version"])), output)
-    check_bundle(output)
-
-
-def main():
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--check", action="store_true", help="verify the checked-in bundle (default; offline)")
-    mode.add_argument("--refresh", action="store_true", help="regenerate from installed exact dependencies and upstream notices")
-    mode.add_argument("--refresh-lite", action="store_true", help="refresh only selected Lite Git notices offline; other dependency inputs must match")
-    mode.add_argument("--refresh-source-notices", action="store_true", help="refresh declared source adaptations offline; all other dependency inputs must match")
-    parser.add_argument("--output", type=Path, default=ROOT / "licenses")
-    parser.add_argument("--platformio-home", type=Path, default=Path(os.environ.get("PLATFORMIO_CORE_DIR", str(Path.home() / ".platformio"))))
-    parser.add_argument("--arduino-libraries", type=Path, default=Path.home() / "Documents/Arduino/libraries")
-    parser.add_argument("--arduino-data", type=Path, default=Path.home() / ("Library/Arduino15" if sys.platform == "darwin" else ".arduino15"))
-    parser.add_argument("--rust-toolchain", type=Path, default=Path.home() / ".rustup/toolchains/esp")
+    parser.add_argument('--check', action='store_true')
+    parser.add_argument('--output', type=Path, default=ROOT / 'licenses')
     args = parser.parse_args()
-    if args.refresh:
-        write_bundle(Collector(args.platformio_home, args.arduino_libraries, args.rust_toolchain, args.arduino_data).collect(), args.output)
-    elif args.refresh_lite:
-        refresh_lite(args.output)
-    elif args.refresh_source_notices:
-        refresh_source_notices(args.output)
-    count = check_bundle(args.output)
-    print(f"license bundle: PASS ({count} components; pinned inputs and notice checksums verified)")
-
-
-if __name__ == "__main__":
-    main()
+    print(f'License inventory: PASS ({check_bundle(args.output)} components)')

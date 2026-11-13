@@ -70,8 +70,6 @@ def factory_partitions(board: str, mode: str, root: Path = ROOT):
     if mode not in BOARDS[board].modes:
         raise ValueError(f"unsupported factory mode: {mode}")
     capability = BOARDS[board]
-    if mode == "rnode":
-        return read_partitions(root / capability.rnode_partition_csv, capability.capacity)
     return capability.partitions(root, standalone=mode == "standalone")
 
 
@@ -118,7 +116,7 @@ def verify_factory(data: bytes, board: str, mode: str, version: str, revision: s
     if hashlib.sha256(data[0xE000:0x10000]).hexdigest() != BOOT_APP0_SHA256:
         raise ValueError(f"{board} {mode}: invalid factory boot metadata")
     occupied = [(0, boot_size), (0x8000, 0x8C00), (0xE000, 0x10000)]
-    roles = {name: name for name in ("launcher", "standalone", "rnode")} if mode == "full" else {mode: "app0"}
+    roles = {mode: "app0"}
     components = {}
     for role, name in roles.items():
         entry = entries[name]

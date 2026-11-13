@@ -1,6 +1,5 @@
 #pragma once
 #include "config/BoardConfig.h"
-#ifdef RSCROWPANEL
 #include <lvgl.h>
 #include <functional>
 #include <string>
@@ -14,6 +13,3 @@ void close();
 void attach(lv_obj_t* root);
 bool visible();
 }
-#else
-namespace TouchKeyboard { inline void close() {} inline void attach(void*) {} inline bool visible() {return false;} }
-#endif

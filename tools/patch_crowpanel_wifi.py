@@ -5,7 +5,103 @@ The installed Arduino SDK and the Arduino 2.x board builds remain untouched.
 """
 import hashlib
 from pathlib import Path
-from patch_wifi_runtime import SCAN_SUPPORT, SCAN_DONE, replace_once
+SCAN_SUPPORT = r'''
+#include <atomic>
+#include <new>
+
+namespace {
+// Only the protocol owner starts/deletes scans. The Arduino event task retires
+// them. Release/acquire keeps result storage private until retirement finishes.
+std::atomic<bool> scanInFlight{false};
+std::atomic<bool> scanCancelled{false};
+std::atomic<esp_err_t> scanError{ESP_OK};
+std::atomic<uint32_t> scanClock{0};
+std::atomic<unsigned> pendingStaStops{0};
+uint32_t scanEventStatus = 0; // Arduino event task only
+constexpr uint16_t scanCapacity = 32;
+struct ScanStatusBits : WiFiGenericClass {
+    static void clear() { clearStatusBits(WIFI_SCANNING_BIT | WIFI_SCAN_DONE_BIT); }
+};
+}
+extern "C" bool handheld_wifi_scan_busy() {
+    return scanInFlight.load(std::memory_order_acquire) ||
+        pendingStaStops.load(std::memory_order_acquire) != 0;
+}
+extern "C" esp_err_t handheld_wifi_scan_error() {
+    return scanError.load(std::memory_order_acquire);
+}
+extern "C" esp_err_t handheld_wifi_scan_cancel() {
+    if (!scanInFlight.load(std::memory_order_acquire)) return ESP_OK;
+    scanCancelled.store(true, std::memory_order_release);
+    return esp_wifi_scan_stop();
+}
+extern "C" void handheld_wifi_scan_done(uint32_t status) {
+    scanEventStatus = status;
+    WiFiScanClass::_scanDone();
+}
+extern "C" void handheld_wifi_scan_stopping() {
+    pendingStaStops.fetch_add(1, std::memory_order_release);
+}
+extern "C" void handheld_wifi_scan_stop_failed() {
+    pendingStaStops.fetch_sub(1, std::memory_order_release);
+}
+extern "C" void handheld_wifi_scan_stopped() {
+    // STA_STOP follows earlier scan events on the same SDK event queue. It is
+    // the recovery barrier when a failed stop did not produce SCAN_DONE.
+    if (!pendingStaStops.load(std::memory_order_acquire)) return;
+    if (scanInFlight.load(std::memory_order_acquire)) {
+        scanError.store(ESP_ERR_WIFI_NOT_STARTED, std::memory_order_relaxed);
+        ScanStatusBits::clear();
+        scanInFlight.store(false, std::memory_order_release);
+    }
+    pendingStaStops.fetch_sub(1, std::memory_order_release);
+}
+'''
+
+SCAN_DONE = r'''void WiFiScanClass::_scanDone()
+{
+    if (!scanInFlight.load(std::memory_order_acquire)) return;
+    esp_err_t error = ESP_OK;
+    uint16_t count = 0;
+    _scanCount = 0;
+    if (scanCancelled.load(std::memory_order_acquire) || scanEventStatus != 0) {
+        error = ESP_FAIL;
+    } else {
+        error = esp_wifi_scan_get_ap_num(&count);
+    }
+    wifi_ap_record_t* rows = nullptr;
+    if (error == ESP_OK && count) {
+        // IDF 4.4 releases its whole list through this bulk API. Bound the
+        // duplicate SDK copy to 32 APs; the application deduplicates up to 15
+        // names. Do not allocate one SDK record per AP in a dense environment.
+        const uint16_t retained = count < scanCapacity ? count : scanCapacity;
+        rows = new (std::nothrow) wifi_ap_record_t[retained];
+        if (!rows) error = ESP_ERR_NO_MEM;
+        else {
+            _scanCount = retained;
+            error = esp_wifi_scan_get_ap_records(&_scanCount, rows);
+            if (count > retained) log_d("Scan list limited to %u of %u APs", retained, count);
+        }
+    }
+    if (error != ESP_OK) {
+        esp_wifi_clear_ap_list();
+        delete[] rows;
+        rows = nullptr;
+        _scanCount = 0;
+    }
+    _scanResult = rows;
+    _scanStarted = 0;
+    scanError.store(error, std::memory_order_relaxed);
+    WiFiGenericClass::clearStatusBits(WIFI_SCANNING_BIT);
+    WiFiGenericClass::setStatusBits(WIFI_SCAN_DONE_BIT);
+    // No result/state writes after this publication: a new scan may now start.
+    scanInFlight.store(false, std::memory_order_release);
+}'''
+
+def replace_once(source: str, before: str, after: str) -> str:
+    if source.count(before) != 1:
+        raise ValueError("WiFi runtime patch must select exactly one reviewed boundary")
+    return source.replace(before, after)
 
 SOURCE_FILES = {
     "WiFiGeneric.cpp": "a6cd2a09564d74a143947989559b7f9ee1f487c5baa929390376d7527765b083",

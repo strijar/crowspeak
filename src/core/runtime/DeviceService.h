@@ -1,6 +1,5 @@
 #pragma once
 
-#if !defined(RSCARDPUTER)
 #include "ServicePump.h"
 #include "MaintenanceBarrier.h"
 #include "ScanResult.h"
@@ -113,4 +112,3 @@ private:
 };
 
 } // namespace handheld
-#endif
