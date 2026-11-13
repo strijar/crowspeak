@@ -152,8 +152,7 @@ void UserConfig::sanitizeScalars(UserScalars& settings) {
     settings.audioEnabled = false;
 #endif
     if (settings.radioRegion >= REGION_COUNT) settings.radioRegion = BOARD_DEFAULT_RADIO_REGION;
-    // Region selects a default; it must not override a supported manual tune,
-    // including after the developer controls are locked again.
+    // Region selects a default; it must not override a supported manual tune.
     if (!loRaFrequencyBand(settings.loraFrequency)) {
         settings.loraFrequency = REGION_FREQ[constrain((int)settings.radioRegion, 0, REGION_COUNT - 1)];
     }
@@ -364,7 +363,6 @@ bool UserConfig::parseJson(const char* json, size_t length, bool persisted, bool
         parsed.nameComplete = doc["name_complete"] | !parsed.displayName.isEmpty();
         parsed.sdStorageEnabled = doc["sd_storage"] | parsed.sdStorageEnabled;
         parsed.announceInterval = handheld::announce::normalizeMinutes(doc["announce_int"] | 30);
-        parsed.devMode     = doc["dev_mode"]     | false;
 
         // Absent fields migrate to OFF/AUTO/AUTO. Invalid new policy values
         // refuse the whole candidate instead of silently changing delivery mode.
@@ -489,7 +487,6 @@ void UserConfig::writeJson(handheld::config::JsonWriter& writer, bool persisted,
     }
     writer.member("sd_storage", scalars.sdStorageEnabled);
     writer.member("announce_int", scalars.announceInterval);
-    writer.member("dev_mode", scalars.devMode);
     writer.member("voice_on", scalars.voice.enabled);
     writer.member("voice_contacts", scalars.voice.contactsOnly);
     writer.member("voice_volume", scalars.voice.volume);

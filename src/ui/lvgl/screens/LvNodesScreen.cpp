@@ -50,9 +50,9 @@ std::string compactAge(unsigned long ageMs) {
     return buf;
 }
 
-std::string peerMetaFor(const DiscoveredNode& node, unsigned long ageMs, bool devMode) {
+std::string peerMetaFor(const DiscoveredNode& node, unsigned long ageMs) {
     std::string meta = compactAge(ageMs);
-    if (devMode && node.rssi != 0) {
+    if (node.rssi != 0) {
         char buf[14];
         snprintf(buf, sizeof(buf), " %ddB", node.rssi);
         meta += buf;
@@ -408,7 +408,7 @@ void LvNodesScreen::bindRows() {
         const auto name = node ? displayNameFor(*node) : row.hex.substr(0, 12);
         if (row.nameText != name) { row.nameText = name; lv_label_set_text(row.name, name.c_str()); }
         lv_obj_set_style_text_color(row.name, lv_color_hex(node && node->saved ? Theme::ACCENT : Theme::PRIMARY), 0);
-        setText(row.meta, node ? peerMetaFor(*node, nodeAgeMs(*node, millis()), _cfg && _cfg->settings().devMode).c_str() : "unavailable");
+        setText(row.meta, node ? peerMetaFor(*node, nodeAgeMs(*node, millis())).c_str() : "unavailable");
         setText(row.id, ("ID: " + row.hex).c_str());
     }
     focusSelection();
@@ -458,12 +458,11 @@ void LvNodesScreen::updateOverlayDetails(const char* title) {
 
     const auto& node = *nodePtr;
     unsigned long age = nodeAgeMs(node, millis());
-    bool devMode = _cfg && _cfg->settings().devMode;
 
     std::string heading = title ? title : displayNameFor(node);
     std::string identity = identityLineFor(node);
     std::string details = node.saved ? "Saved contact / " : "Peer / ";
-    details += peerMetaFor(node, age, devMode);
+    details += peerMetaFor(node, age);
 
     lv_obj_set_style_text_color(_overlayTitle, lv_color_hex(node.saved ? Theme::ACCENT : Theme::PRIMARY), 0);
     lv_obj_set_style_text_color(_overlayReach, lv_color_hex(Theme::TEXT_SECONDARY), 0);

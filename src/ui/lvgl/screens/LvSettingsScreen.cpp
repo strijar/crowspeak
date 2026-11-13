@@ -221,8 +221,7 @@ bool LvSettingsScreen::categoryNeedsReboot(int catIdx) const {
 }
 
 bool LvSettingsScreen::confirmableAction(const SettingItem& item) const {
-    return item.id == SettingId::DeveloperControls
-        || item.id == SettingId::InitializeSd
+    return item.id == SettingId::InitializeSd
         || item.id == SettingId::EraseSd
         || item.id == SettingId::EraseDevice;
 }
@@ -230,8 +229,7 @@ bool LvSettingsScreen::confirmableAction(const SettingItem& item) const {
 bool LvSettingsScreen::armedAction(const SettingItem& item) const {
     return (_confirmingInitSD && item.id == SettingId::InitializeSd) ||
         (_confirmingWipeSD && item.id == SettingId::EraseSd) ||
-        (_confirmingReset && item.id == SettingId::EraseDevice) ||
-        (_confirmingDevMode && item.id == SettingId::DeveloperControls);
+        (_confirmingReset && item.id == SettingId::EraseDevice);
 }
 
 bool LvSettingsScreen::destructiveAction(const SettingItem& item) const {
@@ -243,7 +241,6 @@ const char* LvSettingsScreen::confirmationTitle() const {
     if (_confirmingInitSD) return "ARMED: INITIALIZE SD";
     if (_confirmingWipeSD) return "ARMED: ERASE SD DATA";
     if (_confirmingReset) return "ARMED: ERASE DEVICE";
-    if (_confirmingDevMode) return "ARMED: UNLOCK RF CONTROLS";
     return nullptr;
 }
 
@@ -252,19 +249,17 @@ const char* LvSettingsScreen::confirmationDetail() const {
     if (_confirmingInitSD) return "Hold " BOARD_CONFIRM_INPUT_NAME ": initialize & restart. Back cancels.";
     if (_confirmingWipeSD) return "Hold " BOARD_CONFIRM_INPUT_NAME " to erase SD data. Backspace cancels.";
     if (_confirmingReset) return "Hold " BOARD_CONFIRM_INPUT_NAME " to erase device. Backspace cancels.";
-    if (_confirmingDevMode) return "Hold " BOARD_CONFIRM_INPUT_NAME " to unlock. Backspace cancels.";
     return nullptr;
 }
 
 bool LvSettingsScreen::hasPendingConfirmation() const {
-    return _confirmingInitSD || _confirmingWipeSD || _confirmingReset || _confirmingDevMode;
+    return _confirmingInitSD || _confirmingWipeSD || _confirmingReset;
 }
 
 void LvSettingsScreen::clearConfirmations() {
     _confirmingInitSD = false;
     _confirmingWipeSD = false;
     _confirmingReset = false;
-    _confirmingDevMode = false;
 }
 
 void LvSettingsScreen::runFormatSD() {
@@ -280,30 +275,6 @@ void LvSettingsScreen::runWipeSD() {
 void LvSettingsScreen::runFactoryReset() {
     clearConfirmations();
     if (_service) _service->lifecycle(handheld::Operation::FactoryReset);
-}
-
-void LvSettingsScreen::runEnableDevMode() {
-    _confirmingDevMode = false;
-    if (!_cfg) {
-        rebuildItemList();
-        return;
-    }
-    _cfg->settings().devMode = true;
-    if (!_service) { _cfg->settings().devMode = false; return; }
-    const auto generation = _fwViewGeneration;
-    const bool admitted = _service->applySettings([this, generation](const handheld::Result& result) {
-        _itemsNeedRebuild = true;
-        if (!_viewActive || generation != _fwViewGeneration || _service->settingsPending()) return;
-        buildItems(); _itemsNeedRebuild = false;
-        if (_scrollContainer && _view == SettingsView::ITEM_LIST) rebuildItemList();
-        else if (_scrollContainer && _view == SettingsView::CATEGORY_LIST) rebuildCategoryList();
-        if (result.outcome == handheld::Outcome::Ok && _ui)
-            _ui->lvStatusBar().showToast("Developer radio controls unlocked", 1500);
-    });
-    if (!admitted) {
-        _service->discardSettingsEdit();
-        _itemsNeedRebuild = true;
-    }
 }
 
 void LvSettingsScreen::startFirmwareCheck() {
@@ -379,7 +350,7 @@ void LvSettingsScreen::firmwareCheckTask(void* arg) {
 }
 
 void LvSettingsScreen::buildItems() {
-    // Rebuilding after an identity refresh or developer-mode change can move
+    // Rebuilding after an identity refresh can move
     // every later row. Restore the current category and item by identity.
     SettingsCategoryId category = SettingsCategoryId::None;
     SettingId selected = SettingId::None;
@@ -445,44 +416,42 @@ void LvSettingsScreen::buildItems() {
         _items.back().id = SettingId::LinkPreset;
         idx++;
     }
-    // Custom radio parameters - only visible in Developer Mode
-    if (s.devMode) {
-        _items.push_back({"Frequency", SettingType::INTEGER,
-            [&s]() { return (int)(s.loraFrequency); },
-            [&s](int v) { s.loraFrequency = (uint32_t)v; },
-            [](int v) { return formatRadioFrequency(v); },
-            LORA_MIN_FREQUENCY, LORA_MAX_FREQUENCY, 125000});
-        _items.back().id = SettingId::Frequency;
-        idx++;
-        _items.push_back({"TX Power", SettingType::INTEGER,
-            [&s]() { return s.loraTxPower; }, [&s](int v) { s.loraTxPower = v; },
-            [](int v) { return String(v) + " dBm"; }, -9, 22, 1});
-        _items.back().id = SettingId::TxPower;
-        idx++;
-        _items.push_back({"Spread Factor", SettingType::INTEGER,
-            [&s]() { return s.loraSF; }, [&s](int v) { s.loraSF = v; },
-            [](int v) { return String("SF") + String(v); }, 5, 12, 1});
-        _items.back().id = SettingId::SpreadFactor;
-        idx++;
-        _items.push_back({"Bandwidth", SettingType::ENUM_CHOICE,
-            [&s]() { return RadioBandwidth::index(s.loraBW); },
-            [&s](int v) { s.loraBW = RadioBandwidth::values[constrain(v, 0, RadioBandwidth::count - 1)].hz; },
-            nullptr, 0, RadioBandwidth::count - 1, 1, {}});
-        for (const auto& bandwidth : RadioBandwidth::values)
-            _items.back().enumLabels.push_back(bandwidth.label);
-        _items.back().id = SettingId::Bandwidth;
-        idx++;
-        _items.push_back({"Coding Rate", SettingType::INTEGER,
-            [&s]() { return s.loraCR; }, [&s](int v) { s.loraCR = v; },
-            [](int v) { return String("4/") + String(v); }, 5, 8, 1});
-        _items.back().id = SettingId::CodingRate;
-        idx++;
-        _items.push_back({"Preamble", SettingType::INTEGER,
-            [&s]() { return (int)s.loraPreamble; }, [&s](int v) { s.loraPreamble = v; },
-            [](int v) { return String(v); }, 6, 65, 1});
-        _items.back().id = SettingId::Preamble;
-        idx++;
-    }
+    // Custom radio parameters are always available.
+    _items.push_back({"Frequency", SettingType::INTEGER,
+        [&s]() { return (int)(s.loraFrequency); },
+        [&s](int v) { s.loraFrequency = (uint32_t)v; },
+        [](int v) { return formatRadioFrequency(v); },
+        LORA_MIN_FREQUENCY, LORA_MAX_FREQUENCY, 125000});
+    _items.back().id = SettingId::Frequency;
+    idx++;
+    _items.push_back({"TX Power", SettingType::INTEGER,
+        [&s]() { return s.loraTxPower; }, [&s](int v) { s.loraTxPower = v; },
+        [](int v) { return String(v) + " dBm"; }, -9, 22, 1});
+    _items.back().id = SettingId::TxPower;
+    idx++;
+    _items.push_back({"Spread Factor", SettingType::INTEGER,
+        [&s]() { return s.loraSF; }, [&s](int v) { s.loraSF = v; },
+        [](int v) { return String("SF") + String(v); }, 5, 12, 1});
+    _items.back().id = SettingId::SpreadFactor;
+    idx++;
+    _items.push_back({"Bandwidth", SettingType::ENUM_CHOICE,
+        [&s]() { return RadioBandwidth::index(s.loraBW); },
+        [&s](int v) { s.loraBW = RadioBandwidth::values[constrain(v, 0, RadioBandwidth::count - 1)].hz; },
+        nullptr, 0, RadioBandwidth::count - 1, 1, {}});
+    for (const auto& bandwidth : RadioBandwidth::values)
+        _items.back().enumLabels.push_back(bandwidth.label);
+    _items.back().id = SettingId::Bandwidth;
+    idx++;
+    _items.push_back({"Coding Rate", SettingType::INTEGER,
+        [&s]() { return s.loraCR; }, [&s](int v) { s.loraCR = v; },
+        [](int v) { return String("4/") + String(v); }, 5, 8, 1});
+    _items.back().id = SettingId::CodingRate;
+    idx++;
+    _items.push_back({"Preamble", SettingType::INTEGER,
+        [&s]() { return (int)s.loraPreamble; }, [&s](int v) { s.loraPreamble = v; },
+        [](int v) { return String(v); }, 6, 65, 1});
+    _items.back().id = SettingId::Preamble;
+    idx++;
     _categories.push_back({"LoRa", radioStart, idx - radioStart,
         [this]() {
             if (loraSettingsChanged()) {
@@ -494,7 +463,6 @@ void LvSettingsScreen::buildItems() {
             String label = (p >= 0) ? String(RadioPresets::values[p].name) : String("Custom");
             label += " ";
             label += formatRadioFrequency(s.loraFrequency);
-            if (s.devMode) label += " / Dev";
             return label;
         }});
     _categories.back().id = SettingsCategoryId::LoRa;
@@ -811,7 +779,6 @@ void LvSettingsScreen::buildItems() {
     _categories.push_back({"Identity", devStart, idx - devStart,
         [&s]() -> String {
             String name = s.displayName.isEmpty() ? String("Unnamed device") : s.displayName;
-            if (s.devMode) name += " / Dev Enabled";
             return name;
         }});
     _categories.back().id = SettingsCategoryId::Identity;
@@ -989,41 +956,39 @@ void LvSettingsScreen::buildItems() {
     idx++;
 
 #if HAS_BATTERY_MODEL
-    if (s.devMode) {
-        _items.push_back({"Discharge Curve", SettingType::ENUM_CHOICE,
-            [&s]() { return (int)s.batteryModel; },
-            [&s](int v) { s.batteryModel = (uint8_t)v; },
-            nullptr, BATTERY_MODEL_LIPO, BATTERY_MODEL_LINEAR, 1, {"LiPo / Li-Ion", "Linear"}});
-        _items.back().id = SettingId::DischargeCurve;
-        idx++;
+    _items.push_back({"Discharge Curve", SettingType::ENUM_CHOICE,
+        [&s]() { return (int)s.batteryModel; },
+        [&s](int v) { s.batteryModel = (uint8_t)v; },
+        nullptr, BATTERY_MODEL_LIPO, BATTERY_MODEL_LINEAR, 1, {"LiPo / Li-Ion", "Linear"}});
+    _items.back().id = SettingId::DischargeCurve;
+    idx++;
 
-        _items.push_back({"Charge Above", SettingType::INTEGER,
-            [&s]() { return (int)roundf(s.chargeThresholdV * 100); },
-            [&s](int v) { s.chargeThresholdV = v / 100.0f; },
-            [](int v) -> String {
-                char buf[8]; snprintf(buf, sizeof(buf), "%.2fV", v / 100.0f); return String(buf);
-            }, 380, 430, 1});
-        _items.back().id = SettingId::ChargeAbove;
-        idx++;
-        _items.push_back({"Full Voltage", SettingType::INTEGER,
-            [&s]() { return (int)roundf(s.fullBatteryV * 100); },
-            [&s](int v) { s.fullBatteryV = v / 100.0f; },
-            [](int v) -> String {
-                char buf[8]; snprintf(buf, sizeof(buf), "%.2fV", v / 100.0f); return String(buf);
-            }, 350, 420, 1});
-        _items.back().id = SettingId::FullVoltage;
-        idx++;
+    _items.push_back({"Charge Above", SettingType::INTEGER,
+        [&s]() { return (int)roundf(s.chargeThresholdV * 100); },
+        [&s](int v) { s.chargeThresholdV = v / 100.0f; },
+        [](int v) -> String {
+            char buf[8]; snprintf(buf, sizeof(buf), "%.2fV", v / 100.0f); return String(buf);
+        }, 380, 430, 1});
+    _items.back().id = SettingId::ChargeAbove;
+    idx++;
+    _items.push_back({"Full Voltage", SettingType::INTEGER,
+        [&s]() { return (int)roundf(s.fullBatteryV * 100); },
+        [&s](int v) { s.fullBatteryV = v / 100.0f; },
+        [](int v) -> String {
+            char buf[8]; snprintf(buf, sizeof(buf), "%.2fV", v / 100.0f); return String(buf);
+        }, 350, 420, 1});
+    _items.back().id = SettingId::FullVoltage;
+    idx++;
 
-        _items.push_back({"Voltage", SettingType::READONLY, nullptr, nullptr,
-            [this](int) -> String {
-                if (!_power) return String("--");
-                char buf[12];
-                snprintf(buf, sizeof(buf), "%.2fV", _power->batteryVoltage());
-                return String(buf);
-            }});
-        _items.back().id = SettingId::Voltage;
-        idx++;
-    }
+    _items.push_back({"Voltage", SettingType::READONLY, nullptr, nullptr,
+        [this](int) -> String {
+            if (!_power) return String("--");
+            char buf[12];
+            snprintf(buf, sizeof(buf), "%.2fV", _power->batteryVoltage());
+            return String(buf);
+        }});
+    _items.back().id = SettingId::Voltage;
+    idx++;
 
 #endif
     _categories.push_back({"Battery", battStart, idx - battStart,
@@ -1188,36 +1153,6 @@ void LvSettingsScreen::buildItems() {
         }});
     _items.back().id = SettingId::Uptime;
     idx++;
-    {
-        SettingItem devModeItem;
-        devModeItem.label = "Developer Radio Controls";
-        devModeItem.type = SettingType::ACTION;
-        devModeItem.formatter = [this, &s](int) {
-            if (_confirmingDevMode) return String("Hold");
-            return s.devMode ? String("Unlocked") : String("Locked");
-        };
-        devModeItem.action = [this, &s]() {
-            if (s.devMode) {
-                s.devMode = false;
-                _confirmingDevMode = false;
-                clearConfirmations();
-                _itemsNeedRebuild = true;
-                applyAndSave(true);
-                return;
-            }
-            if (!_confirmingDevMode) {
-                clearConfirmations();
-                _confirmingDevMode = true;
-                if (_ui) _ui->lvStatusBar().showToast("RF controls armed. Hold to unlock", 5000);
-                rebuildItemList();
-                return;
-            }
-            if (_ui) _ui->lvStatusBar().showToast("Hold " BOARD_CONFIRM_INPUT_NAME " to unlock RF controls", 2500);
-        };
-        _items.push_back(devModeItem);
-        _items.back().id = SettingId::DeveloperControls;
-        idx++;
-    }
     {
         SettingItem rebootItem;
         rebootItem.label = "Reboot Now";
@@ -1585,7 +1520,7 @@ void LvSettingsScreen::rebuildItemList() {
     const char* confirmTitle = confirmationTitle();
     const char* confirmDetail = confirmationDetail();
     if (confirmTitle && confirmDetail) {
-        uint32_t confirmColor = _confirmingDevMode || _confirmingInitSD ? Theme::WARNING_CLR : Theme::ERROR_CLR;
+        uint32_t confirmColor = _confirmingInitSD ? Theme::WARNING_CLR : Theme::ERROR_CLR;
         lv_obj_t* confirm = lv_obj_create(_scrollContainer);
         lv_obj_set_size(confirm, Theme::CONTENT_W, 34);
     lv_obj_set_height(confirm, 56);
@@ -2301,7 +2236,7 @@ bool LvSettingsScreen::handleKey(const KeyEvent& event) {
                     if (!confirmableAction(item)) clearConfirmations();
                     if (item.action) item.action();
                     // Finish the callback before replacing the std::function
-                    // that owns it (developer-mode locking changes the rows).
+                    // that owns it when the visible rows change.
                     if (_itemsNeedRebuild && (!_service || !_service->settingsPending())) {
                         _itemsNeedRebuild = false;
                         buildItems();
@@ -2439,10 +2374,7 @@ bool LvSettingsScreen::handleLongPress() {
         runFactoryReset();
         return true;
     }
-    if (_confirmingDevMode && item.id == SettingId::DeveloperControls) {
-        runEnableDevMode();
-        return true;
-    }
+
 
     if (_ui) _ui->lvStatusBar().showToast("Select armed action, then hold", 2000);
     return true;

@@ -75,7 +75,7 @@ enum class SettingId : uint8_t {
     Heap,
     Psram,
     Uptime,
-    DeveloperControls,
+    ReservedControls, // Retired setting; preserve subsequent routing IDs.
     Reboot,
     EraseDevice,
     PlaybackVolume,

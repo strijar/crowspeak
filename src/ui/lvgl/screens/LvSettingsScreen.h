@@ -138,7 +138,6 @@ private:
     void runFormatSD();
     void runWipeSD();
     void runFactoryReset();
-    void runEnableDevMode();
     void startFirmwareCheck();
     static void firmwareCheckTask(void* arg);
 
@@ -173,7 +172,6 @@ private:
     bool _confirmingInitSD = false;
     bool _confirmingWipeSD = false;
     bool _confirmingReset = false;
-    bool _confirmingDevMode = false;
 
     enum class FirmwareCheckState : uint8_t {
         IDLE,

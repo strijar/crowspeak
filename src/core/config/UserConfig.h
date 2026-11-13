@@ -133,8 +133,6 @@ struct UserScalars {
     // Announce
     uint16_t announceInterval = 30; // 0 = OFF; otherwise minutes, 30-360
 
-    // Developer mode — unlocks custom radio parameters
-    bool devMode = false;
 };
 static_assert(std::is_trivially_copyable<UserScalars>::value, "Scalar settings must copy without allocation");
 

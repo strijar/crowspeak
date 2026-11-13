@@ -41,7 +41,7 @@ Hardware testing of this port has confirmed:
 - Sending and receiving messages through the manufacturer's SX1262 module.
 - Wi-Fi operation (reported by the device owner; individual AP/TCP scenarios
   have not been separately qualified here).
-- RU/EN touch keyboard and touch confirmation for Developer Radio Controls.
+- RU/EN touch keyboard and custom radio controls.
 - Removal of the display synchronization artifacts observed during language
   changes, after switching RGB output to SRAM bounce buffers.
 
@@ -177,9 +177,8 @@ through the normal settings service without reconfiguring the radio.
 
 Settings choices and numeric values have touch editors. The recovery screens
 also have touch buttons; destructive recovery requires a separate confirmation.
-To unlock **Developer Radio Controls**, tap its row once, release, then press
-and hold the same armed row until it unlocks. The same two-step gesture confirms
-armed settings actions. Tap the Back header to cancel.
+Custom radio parameters are always available in Settings. Armed settings actions
+require a tap, release, then press-and-hold confirmation. Tap the Back header to cancel.
 
 Optional layouts are described in `src/ui/lvgl/KeyboardLayouts.h`. Append layouts
 to the registry (EN=0, RU=1 are persistent indices), or supply entries through
@@ -221,8 +220,7 @@ For logs, reopen the port at 115200 baud:
 ```
 
 After boot, configure your name, matching LoRa parameters, and optionally Wi-Fi
-in Settings. Wi-Fi is off by default. For custom LoRa values, unlock
-**Developer Radio Controls** using the tap/release/hold gesture described above.
+in Settings. Wi-Fi is off by default. Custom LoRa values are available immediately.
 
 ## Troubleshooting the build
 
