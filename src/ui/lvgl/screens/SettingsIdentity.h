@@ -4,8 +4,18 @@
 
 // Routing identities are independent of wording and category order.
 enum class SettingsCategoryId : uint8_t {
-    None, LoRa, Network, Propagation, Voice, Identity, Display, Alerts,
-    TimeLocation, Battery, Storage, Device
+    None,
+    LoRa,
+    Network,
+    Propagation,
+    Voice,
+    Identity,
+    Display,
+    Alerts,
+    TimeLocation,
+    Battery,
+    Storage,
+    Device
 };
 
 enum class SettingId : uint8_t {
@@ -39,7 +49,7 @@ enum class SettingId : uint8_t {
     ImportIdentity,
     IdentityHash,
     ScreenBrightness,
-    Theme,
+    ReservedTheme, // Retired; keep subsequent setting IDs stable.
     DimAfter,
     DisplayOffAfter,
     KeyBacklight,

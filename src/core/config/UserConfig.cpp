@@ -329,7 +329,6 @@ bool UserConfig::parseJson(const char* json, size_t length, bool persisted, bool
         parsed.brightness = constrain(rawBri, 1, 100);
         parsed.denseFontMode    = doc["dense_font"] | false;
         parsed.touchKeyboardLayout = constrain(doc["touch_keyboard_layout"] | 0, 0, 255);
-        parsed.themeLight       = doc["theme_light"] | false;
         parsed.keyboardBrightness = constrain(doc["kb_brightness"] | 0, 0, 100);
         parsed.keyboardAutoOn     = doc["kb_auto_on"] | false;
         parsed.keyboardAutoOff    = doc["kb_auto_off"] | false;
@@ -453,7 +452,6 @@ void UserConfig::writeJson(handheld::config::JsonWriter& writer, bool persisted,
     writer.member("brightness", scalars.brightness);
     writer.member("dense_font", scalars.denseFontMode);
     writer.member("touch_keyboard_layout", scalars.touchKeyboardLayout);
-    writer.member("theme_light", scalars.themeLight);
     writer.member("kb_brightness", scalars.keyboardBrightness);
     writer.member("kb_auto_on", scalars.keyboardAutoOn);
     writer.member("kb_auto_off", scalars.keyboardAutoOff);

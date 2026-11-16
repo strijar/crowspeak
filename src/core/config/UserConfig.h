@@ -89,7 +89,6 @@ struct UserScalars {
     uint16_t screenOffTimeout = 60;   // seconds
     uint8_t brightness = BOARD_DEFAULT_BRIGHTNESS;  // Percentage 1-100, per-board default
     bool denseFontMode = false;       // Persisted compatibility field; no active renderer control.
-    bool themeLight = false;          // false = dark (original palette)
 
     // Battery
     uint8_t batteryDisplay = BATTERY_DISPLAY_BAR;

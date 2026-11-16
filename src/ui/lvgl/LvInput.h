@@ -14,15 +14,15 @@ struct KeyEvent;
 namespace LvInput {
 
 #if HAS_TRACKBALL
-void init(Keyboard* kb, Trackball* tb, TouchInput* touch);
+void init(Keyboard *kb, Trackball *tb, TouchInput *touch);
 #elif HAS_SCROLLWHEEL
-void init(Keyboard* kb, Scrollwheel* sw, TouchInput* touch);
+void init(Keyboard *kb, Scrollwheel *sw, TouchInput *touch);
 #else
-void init(Keyboard* kb, TouchInput* touch = nullptr);
+void init(Keyboard *kb, TouchInput *touch = nullptr);
 #endif
 
 // Feed a KeyEvent into the LVGL keypad indev (called from main loop)
-bool feedKey(const KeyEvent& evt);
+bool feedKey(const KeyEvent &evt);
 bool canAcceptKey();
 // Call for every dispatched key, including keys handled directly by a screen.
 void noteKeyActivity();
@@ -30,10 +30,10 @@ void noteKeyActivity();
 void setEnabled(bool enabled);
 
 // Get the LVGL input group (for focusing widgets)
-lv_group_t* group();
+lv_group_t *group();
 // Retained screens own separate focus groups; only the visible one receives input.
-lv_group_t* createGroup();
-void setGroup(lv_group_t* group);
+lv_group_t *createGroup();
+void        setGroup(lv_group_t *group);
 
 // Navbar (tab-cycling) mode: hide the in-content focus ring. Group focus stays
 // logical so entering the screen restores the ring on the last-focused widget.
@@ -42,9 +42,6 @@ bool focusSuppressed();
 
 // Focus a widget through the suppression filter — use instead of
 // lv_group_focus_obj() for a screen's initial focus placement.
-void focusObj(lv_obj_t* obj);
+void focusObj(lv_obj_t *obj);
 
-// Re-apply palette colors to the touch cursor after a theme switch
-void applyTheme();
-
-}  // namespace LvInput
+} // namespace LvInput

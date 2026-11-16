@@ -14,7 +14,7 @@ ifeq ($(filter $(DEVICE),$(SUPPORTED_DEVICES)),)
 $(error Unsupported DEVICE '$(DEVICE)'; choose one of: $(SUPPORTED_DEVICES))
 endif
 
-.PHONY: all build setup doctor doctor-source source-check build-standalone check check-all bundle standalone-image package package-all protocol-check software-check release flash clean
+.PHONY: all build setup doctor doctor-source source-check build-standalone ui-check check check-all bundle standalone-image package package-all protocol-check software-check release flash clean
 all: bundle
 build: package
 setup:
@@ -32,6 +32,8 @@ source-check:
 	$(PYTHON) tools/check_crowpanel_sdk.py
 build-standalone:
 	$(PYTHON) -m platformio run -e $(STANDALONE_ENV)
+ui-check:
+	$(PYTHON) tools/check_ui_styles.py
 check: build-standalone
 	$(PYTHON) tools/check_image_fit.py --device $(DEVICE) --standalone .pio/build/$(STANDALONE_ENV)/firmware.bin
 check-all: check

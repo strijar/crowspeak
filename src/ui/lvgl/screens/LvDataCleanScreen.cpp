@@ -1,52 +1,12 @@
 #include "LvDataCleanScreen.h"
-#include "Theme.h"
-#include "LvTheme.h"
+#include "Style.h"
 #include "config/Config.h"
-#include "fonts/fonts.h"
 
 namespace {
 
-lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
-                    uint32_t color, lv_coord_t width, lv_text_align_t align,
-                    lv_label_long_mode_t mode = LV_LABEL_LONG_WRAP) {
-    lv_obj_t* lbl = lv_label_create(parent);
-    lv_obj_set_width(lbl, width);
-    lv_obj_set_style_text_font(lbl, font, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(color), 0);
-    lv_obj_set_style_text_align(lbl, align, 0);
-    lv_label_set_long_mode(lbl, mode);
-    lv_label_set_text(lbl, text);
-    return lbl;
-}
+} // namespace
 
-lv_obj_t* makeChoice(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) {
-    lv_obj_t* box = lv_obj_create(parent);
-    lv_obj_set_pos(box, x, y);
-    lv_obj_set_size(box, 126, 34);
-    lv_obj_set_style_bg_color(box, lv_color_hex(Theme::BG_ELEVATED), 0);
-    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(box, lv_color_hex(Theme::BORDER), 0);
-    lv_obj_set_style_border_width(box, 1, 0);
-    lv_obj_set_style_radius(box, 4, 0);
-    lv_obj_set_style_pad_all(box, 0, 0);
-    lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);
-    return box;
-}
-
-void styleChoice(lv_obj_t* box, bool selected, bool destructive, bool armed) {
-    if (!box) return;
-    uint32_t border = selected ? (destructive && armed ? Theme::ERROR_CLR : Theme::PRIMARY) : Theme::BORDER;
-    uint32_t bg = selected ? Theme::PRIMARY_SUBTLE : Theme::BG_ELEVATED;
-    if (destructive && armed) bg = Theme::ERROR_SUBTLE;
-    lv_obj_set_style_bg_color(box, lv_color_hex(bg), 0);
-    lv_obj_set_style_border_color(box, lv_color_hex(border), 0);
-    lv_obj_set_style_border_width(box, selected ? 2 : 1, 0);
-}
-
-}  // namespace
-
-void LvDataCleanScreen::createUI(lv_obj_t* parent) {
+void LvDataCleanScreen::createUI(lv_obj_t *parent) {
     _screen = parent;
     _yesBox = nullptr;
     _noBox = nullptr;
@@ -56,51 +16,96 @@ void LvDataCleanScreen::createUI(lv_obj_t* parent) {
     _confirmLabel = nullptr;
     _statusLabel = nullptr;
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(parent, lv_color_hex(Theme::BG), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
+    {
+        lv_obj_remove_style(parent, Style::listColor, 0);
+        lv_obj_add_style(parent, Style::listColor, 0);
+    }
+    {
+        lv_obj_remove_style(parent, Style::opaque, 0);
+        lv_obj_add_style(parent, Style::opaque, 0);
+    }
     _selectedYes = false;
     _confirmWipe = false;
 
-    lv_obj_t* eyebrow = makeLabel(parent, "STORAGE CHECK", &lv_font_rsdeck_10,
-                                  Theme::TEXT_SECONDARY, 220, LV_TEXT_ALIGN_CENTER,
-                                  LV_LABEL_LONG_DOT);
-    lv_obj_align(eyebrow, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_t *eyebrow = lv_label_create(parent);
+    lv_obj_add_style(eyebrow, Style::setupEyebrow, 0);
+    lv_obj_add_style(eyebrow, Style::fontCaption, 0);
+    lv_obj_add_style(eyebrow, Style::textSecondary, 0);
 
-    lv_obj_t* title = makeLabel(parent, "SD DATA FOUND", &lv_font_montserrat_16,
-                                Theme::ACCENT, 260, LV_TEXT_ALIGN_CENTER,
-                                LV_LABEL_LONG_DOT);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 28);
+    lv_label_set_long_mode(eyebrow, LV_LABEL_LONG_DOT);
+    lv_label_set_text(eyebrow, "STORAGE CHECK");
 
-    lv_obj_t* msg = makeLabel(parent,
-        DEVICE_NAME " found older data on the SD card.",
-        &lv_font_rsdeck_12, Theme::TEXT_PRIMARY, 268, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(msg, LV_ALIGN_TOP_MID, 0, 58);
+    lv_obj_t *title = lv_label_create(parent);
+    lv_obj_add_style(title, Style::storageTitle, 0);
+    lv_obj_add_style(title, Style::fontHeading, 0);
+    lv_obj_add_style(title, Style::textAccent, 0);
 
-    lv_obj_t* prompt = makeLabel(parent,
-        "Erase affects SD copies only. Imported device data is kept.",
-        &lv_font_rsdeck_12, Theme::TEXT_SECONDARY, 276, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(prompt, LV_ALIGN_TOP_MID, 0, 82);
+    lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
+    lv_label_set_text(title, "SD DATA FOUND");
 
-    _noBox = makeChoice(parent, 28, 122);
-    _noLabel = makeLabel(_noBox, "KEEP DATA", &lv_font_rsdeck_12,
-                         Theme::TEXT_PRIMARY, 112, LV_TEXT_ALIGN_CENTER,
-                         LV_LABEL_LONG_DOT);
-    lv_obj_center(_noLabel);
-    lv_obj_add_event_cb(_noBox, [](lv_event_t* e) {
+    lv_obj_t *msg = lv_label_create(parent);
+    lv_obj_add_style(msg, Style::storageDescription, 0);
+    lv_obj_add_style(msg, Style::fontBody, 0);
+    lv_obj_add_style(msg, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(msg, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(msg, DEVICE_NAME " found older data on the SD card.");
+
+    lv_obj_t *prompt = lv_label_create(parent);
+    lv_obj_add_style(prompt, Style::storagePrompt, 0);
+    lv_obj_add_style(prompt, Style::fontBody, 0);
+    lv_obj_add_style(prompt, Style::textSecondary, 0);
+
+    lv_label_set_long_mode(prompt, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(prompt, "Erase affects SD copies only. Imported device data is kept.");
+
+    _noBox = lv_obj_create(parent);
+    lv_obj_add_style(_noBox, Style::choiceButton, 0);
+    lv_obj_add_style(_noBox, Style::choiceLeft, 0);
+
+    lv_obj_add_style(_noBox, Style::bgElevated, 0);
+
+    lv_obj_add_style(_noBox, Style::borderBorder, 0);
+
+    lv_obj_clear_flag(_noBox, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(_noBox, LV_OBJ_FLAG_CLICKABLE);
+
+    _noLabel = lv_label_create(_noBox);
+    lv_obj_add_style(_noLabel, Style::buttonCaption, 0);
+    lv_obj_add_style(_noLabel, Style::fontBody, 0);
+    lv_obj_add_style(_noLabel, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(_noLabel, LV_LABEL_LONG_DOT);
+    lv_label_set_text(_noLabel, "KEEP DATA");
+
+    lv_obj_add_event_cb(_noBox, [](lv_event_t *e) {
         auto* self = static_cast<LvDataCleanScreen*>(lv_event_get_user_data(e));
         if (!self) return;
         self->_selectedYes = false;
         self->_confirmWipe = false;
         self->updateSelection();
-        if (self->_doneCb) self->_doneCb(false);
-    }, LV_EVENT_CLICKED, this);
+        if (self->_doneCb) self->_doneCb(false); }, LV_EVENT_CLICKED, this);
 
-    _yesBox = makeChoice(parent, 166, 122);
-    _yesLabel = makeLabel(_yesBox, "ERASE", &lv_font_rsdeck_12,
-                          Theme::TEXT_PRIMARY, 112, LV_TEXT_ALIGN_CENTER,
-                          LV_LABEL_LONG_DOT);
-    lv_obj_center(_yesLabel);
-    lv_obj_add_event_cb(_yesBox, [](lv_event_t* e) {
+    _yesBox = lv_obj_create(parent);
+    lv_obj_add_style(_yesBox, Style::choiceButton, 0);
+    lv_obj_add_style(_yesBox, Style::choiceRight, 0);
+
+    lv_obj_add_style(_yesBox, Style::bgElevated, 0);
+
+    lv_obj_add_style(_yesBox, Style::borderBorder, 0);
+
+    lv_obj_clear_flag(_yesBox, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(_yesBox, LV_OBJ_FLAG_CLICKABLE);
+
+    _yesLabel = lv_label_create(_yesBox);
+    lv_obj_add_style(_yesLabel, Style::buttonCaption, 0);
+    lv_obj_add_style(_yesLabel, Style::fontBody, 0);
+    lv_obj_add_style(_yesLabel, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(_yesLabel, LV_LABEL_LONG_DOT);
+    lv_label_set_text(_yesLabel, "ERASE");
+
+    lv_obj_add_event_cb(_yesBox, [](lv_event_t *e) {
         auto* self = static_cast<LvDataCleanScreen*>(lv_event_get_user_data(e));
         if (!self) return;
         self->_selectedYes = true;
@@ -109,82 +114,165 @@ void LvDataCleanScreen::createUI(lv_obj_t* parent) {
             self->updateSelection();
             return;
         }
-        if (self->_doneCb) self->_doneCb(true);
-    }, LV_EVENT_CLICKED, this);
+        if (self->_doneCb) self->_doneCb(true); }, LV_EVENT_CLICKED, this);
 
-    _confirmLabel = makeLabel(parent, "", &lv_font_rsdeck_12,
-                              Theme::WARNING_CLR, 280, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(_confirmLabel, LV_ALIGN_TOP_MID, 0, 164);
+    _confirmLabel = lv_label_create(parent);
+    lv_obj_add_style(_confirmLabel, Style::confirmationHint, 0);
+    lv_obj_add_style(_confirmLabel, Style::fontBody, 0);
+    lv_obj_add_style(_confirmLabel, Style::textWarning, 0);
 
-    _hintLabel = makeLabel(parent,
+    lv_label_set_long_mode(_confirmLabel, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(_confirmLabel, "");
+
 #if HAS_SCROLLWHEEL
-                          "Wheel chooses  Enter continues",
+    const char *inputHint = "Wheel chooses  Enter continues";
 #else
-                          "Left/Right choose  Enter continues",
+    const char *inputHint = "Left/Right choose  Enter continues";
 #endif
-                           &lv_font_rsdeck_12, Theme::ACCENT,
-                           286, LV_TEXT_ALIGN_CENTER, LV_LABEL_LONG_DOT);
-    lv_obj_align(_hintLabel, LV_ALIGN_TOP_MID, 0, 188);
 
-    _statusLabel = makeLabel(parent, "", &lv_font_rsdeck_12,
-                             Theme::PRIMARY, 286, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(_statusLabel, LV_ALIGN_TOP_MID, 0, 140);
+    _hintLabel = lv_label_create(parent);
+    lv_obj_add_style(_hintLabel, Style::inputHint, 0);
+    lv_obj_add_style(_hintLabel, Style::fontBody, 0);
+    lv_obj_add_style(_hintLabel, Style::textAccent, 0);
+
+    lv_label_set_long_mode(_hintLabel, LV_LABEL_LONG_DOT);
+    lv_label_set_text(_hintLabel, inputHint);
+
+    _statusLabel = lv_label_create(parent);
+    lv_obj_add_style(_statusLabel, Style::operationStatus, 0);
+    lv_obj_add_style(_statusLabel, Style::fontBody, 0);
+    lv_obj_add_style(_statusLabel, Style::textActiveTabText, 0);
+
+    lv_label_set_long_mode(_statusLabel, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(_statusLabel, "");
+
     lv_obj_add_flag(_statusLabel, LV_OBJ_FLAG_HIDDEN);
     updateSelection();
 
-    lv_obj_t* ver = makeLabel(parent, "", &lv_font_rsdeck_10,
-                              Theme::TEXT_MUTED, 120, LV_TEXT_ALIGN_CENTER,
-                              LV_LABEL_LONG_DOT);
+    lv_obj_t *ver = lv_label_create(parent);
+    lv_obj_add_style(ver, Style::versionText, 0);
+    lv_obj_add_style(ver, Style::fontCaption, 0);
+    lv_obj_add_style(ver, Style::textMuted, 0);
+
+    lv_label_set_long_mode(ver, LV_LABEL_LONG_DOT);
+    lv_label_set_text(ver, "");
+
     char verBuf[32];
     snprintf(verBuf, sizeof(verBuf), "v%s", RSDECK_VERSION_STRING);
     lv_label_set_text(ver, verBuf);
     // Pager's shorter boot surface needs this footer below the action hint.
-    lv_obj_align(ver, LV_ALIGN_BOTTOM_MID, 0, Theme::SCREEN_H < 240 ? -4 : -10);
+    lv_obj_add_style(ver, Style::versionFooter, 0);
 }
 
 void LvDataCleanScreen::updateSelection() {
-    styleChoice(_noBox, !_selectedYes, false, false);
-    styleChoice(_yesBox, _selectedYes, true, _confirmWipe);
+    {
+        if (_noBox) {
+            uint32_t border = (!_selectedYes) ? (false && false ? Style::ERROR_CLR : Style::PRIMARY) : Style::BORDER;
+            uint32_t bg = (!_selectedYes) ? Style::PRIMARY_SUBTLE : Style::BG_ELEVATED;
+            if (false && false)
+                bg = Style::ERROR_SUBTLE;
+            {
+                for (auto *tone : Style::bgTones)
+                    lv_obj_remove_style(_noBox, tone, 0);
+                lv_obj_add_style(_noBox, Style::bgTones[bg], 0);
+            }
+            {
+                for (auto *tone : Style::borderTones)
+                    lv_obj_remove_style(_noBox, tone, 0);
+                lv_obj_add_style(_noBox, Style::borderTones[border], 0);
+            }
+            {
+                lv_obj_remove_style(_noBox, Style::buttonPressed, 0);
+                lv_obj_remove_style(_noBox, Style::borderStrong, 0);
+                {
+                    lv_obj_remove_style(_noBox, (!_selectedYes) ? Style::borderStrong : Style::buttonPressed, 0);
+                    lv_obj_add_style(_noBox, (!_selectedYes) ? Style::borderStrong : Style::buttonPressed, 0);
+                }
+            }
+        }
+    }
+    {
+        if (_yesBox) {
+            uint32_t border = _selectedYes ? (true && _confirmWipe ? Style::ERROR_CLR : Style::PRIMARY) : Style::BORDER;
+            uint32_t bg = _selectedYes ? Style::PRIMARY_SUBTLE : Style::BG_ELEVATED;
+            if (true && _confirmWipe)
+                bg = Style::ERROR_SUBTLE;
+            {
+                for (auto *tone : Style::bgTones)
+                    lv_obj_remove_style(_yesBox, tone, 0);
+                lv_obj_add_style(_yesBox, Style::bgTones[bg], 0);
+            }
+            {
+                for (auto *tone : Style::borderTones)
+                    lv_obj_remove_style(_yesBox, tone, 0);
+                lv_obj_add_style(_yesBox, Style::borderTones[border], 0);
+            }
+            {
+                lv_obj_remove_style(_yesBox, Style::buttonPressed, 0);
+                lv_obj_remove_style(_yesBox, Style::borderStrong, 0);
+                {
+                    lv_obj_remove_style(_yesBox, _selectedYes ? Style::borderStrong : Style::buttonPressed, 0);
+                    lv_obj_add_style(_yesBox, _selectedYes ? Style::borderStrong : Style::buttonPressed, 0);
+                }
+            }
+        }
+    }
 
     if (_selectedYes) {
-        lv_obj_set_style_text_color(_yesLabel,
-            lv_color_hex(_confirmWipe ? Theme::ERROR_CLR : Theme::WARNING_CLR), 0);
-        lv_obj_set_style_text_color(_noLabel, lv_color_hex(Theme::TEXT_MUTED), 0);
+        {
+            for (auto *tone : Style::textTones)
+                lv_obj_remove_style(_yesLabel, tone, 0);
+            lv_obj_add_style(_yesLabel, Style::textTones[_confirmWipe ? Style::ERROR_CLR : Style::WARNING_CLR], 0);
+        }
+        {
+            lv_obj_remove_style(_noLabel, Style::textMuted, 0);
+            lv_obj_add_style(_noLabel, Style::textMuted, 0);
+        }
         if (_confirmLabel) {
-            lv_label_set_text(_confirmLabel,
-                _confirmWipe ? "Erase armed. Press Enter again to wipe." :
-                               "Erase will remove old SD data.");
+            lv_label_set_text(_confirmLabel, _confirmWipe ? "Erase armed. Press Enter again to wipe." : "Erase will remove old SD data.");
         }
         if (_hintLabel) {
             lv_label_set_text(_hintLabel,
 #if HAS_SCROLLWHEEL
-                _confirmWipe ? "Enter: erase  Wheel up: cancel" :
-                               "Enter: arm erase  Wheel up: cancel");
+                              _confirmWipe ? "Enter: erase  Wheel up: cancel" : "Enter: arm erase  Wheel up: cancel");
 #else
-                _confirmWipe ? "Enter confirms erase  Left cancels" :
-                               "Enter arms erase  Left cancels");
+                              _confirmWipe ? "Enter confirms erase  Left cancels" : "Enter arms erase  Left cancels");
 #endif
         }
     } else {
-        lv_obj_set_style_text_color(_yesLabel, lv_color_hex(Theme::TEXT_MUTED), 0);
-        lv_obj_set_style_text_color(_noLabel, lv_color_hex(Theme::ACCENT), 0);
-        if (_confirmLabel) lv_label_set_text(_confirmLabel, "Recommended: keep existing data.");
-        if (_hintLabel) lv_label_set_text(_hintLabel,
+        {
+            lv_obj_remove_style(_yesLabel, Style::textMuted, 0);
+            lv_obj_add_style(_yesLabel, Style::textMuted, 0);
+        }
+        {
+            lv_obj_remove_style(_noLabel, Style::textAccent, 0);
+            lv_obj_add_style(_noLabel, Style::textAccent, 0);
+        }
+        if (_confirmLabel)
+            lv_label_set_text(_confirmLabel, "Recommended: keep existing data.");
+        if (_hintLabel)
+            lv_label_set_text(_hintLabel,
 #if HAS_SCROLLWHEEL
-            "Enter: keep  Wheel down: erase");
+                              "Enter: keep  Wheel down: erase");
 #else
-            "Enter keeps data  Right selects erase");
+                              "Enter keeps data  Right selects erase");
 #endif
     }
 }
 
-void LvDataCleanScreen::showStatus(const char* msg) {
-    if (_yesBox) lv_obj_add_flag(_yesBox, LV_OBJ_FLAG_HIDDEN);
-    if (_noBox) lv_obj_add_flag(_noBox, LV_OBJ_FLAG_HIDDEN);
-    if (_yesLabel) lv_obj_add_flag(_yesLabel, LV_OBJ_FLAG_HIDDEN);
-    if (_noLabel) lv_obj_add_flag(_noLabel, LV_OBJ_FLAG_HIDDEN);
-    if (_hintLabel) lv_obj_add_flag(_hintLabel, LV_OBJ_FLAG_HIDDEN);
-    if (_confirmLabel) lv_obj_add_flag(_confirmLabel, LV_OBJ_FLAG_HIDDEN);
+void LvDataCleanScreen::showStatus(const char *msg) {
+    if (_yesBox)
+        lv_obj_add_flag(_yesBox, LV_OBJ_FLAG_HIDDEN);
+    if (_noBox)
+        lv_obj_add_flag(_noBox, LV_OBJ_FLAG_HIDDEN);
+    if (_yesLabel)
+        lv_obj_add_flag(_yesLabel, LV_OBJ_FLAG_HIDDEN);
+    if (_noLabel)
+        lv_obj_add_flag(_noLabel, LV_OBJ_FLAG_HIDDEN);
+    if (_hintLabel)
+        lv_obj_add_flag(_hintLabel, LV_OBJ_FLAG_HIDDEN);
+    if (_confirmLabel)
+        lv_obj_add_flag(_confirmLabel, LV_OBJ_FLAG_HIDDEN);
     if (_statusLabel) {
         lv_label_set_text(_statusLabel, msg ? msg : "");
         lv_obj_clear_flag(_statusLabel, LV_OBJ_FLAG_HIDDEN);
@@ -192,7 +280,7 @@ void LvDataCleanScreen::showStatus(const char* msg) {
     lv_timer_handler();
 }
 
-bool LvDataCleanScreen::handleKey(const KeyEvent& event) {
+bool LvDataCleanScreen::handleKey(const KeyEvent &event) {
     if (event.left || event.up) {
         _selectedYes = false;
         _confirmWipe = false;
@@ -211,8 +299,9 @@ bool LvDataCleanScreen::handleKey(const KeyEvent& event) {
             updateSelection();
             return true;
         }
-        if (_doneCb) _doneCb(_selectedYes);
+        if (_doneCb)
+            _doneCb(_selectedYes);
         return true;
     }
-    return true;  // Consume all keys
+    return true; // Consume all keys
 }

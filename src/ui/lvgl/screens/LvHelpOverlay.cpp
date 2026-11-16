@@ -1,108 +1,249 @@
 #include "LvHelpOverlay.h"
-#include "Theme.h"
-#include "LvTheme.h"
+#include "Style.h"
 #include "config/BoardConfig.h"
 #include <lvgl.h>
-#include "fonts/fonts.h"
-
-namespace {
-
-lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
-                    uint32_t color, lv_coord_t width, lv_text_align_t align,
-                    lv_label_long_mode_t mode = LV_LABEL_LONG_DOT) {
-    lv_obj_t* lbl = lv_label_create(parent);
-    lv_obj_set_width(lbl, width);
-    lv_obj_set_style_text_font(lbl, font, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(color), 0);
-    lv_obj_set_style_text_align(lbl, align, 0);
-    lv_label_set_long_mode(lbl, mode);
-    lv_label_set_text(lbl, text);
-    return lbl;
-}
-
-lv_obj_t* makeRow(lv_obj_t* parent) {
-    lv_obj_t* row = lv_obj_create(parent);
-    lv_obj_set_size(row, lv_pct(100), 13);
-    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(row, 0, 0);
-    lv_obj_set_style_pad_all(row, 0, 0);
-    lv_obj_set_style_pad_column(row, 6, 0);
-    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    return row;
-}
-
-void addHelpRow(lv_obj_t* parent, const char* keys, const char* action) {
-    lv_obj_t* row = makeRow(parent);
-    makeLabel(row, keys, &lv_font_rsdeck_10, Theme::ACCENT, 72, LV_TEXT_ALIGN_LEFT);
-    makeLabel(row, action, &lv_font_rsdeck_10, Theme::TEXT_PRIMARY, 178, LV_TEXT_ALIGN_LEFT);
-}
-
-}  // namespace
 
 void LvHelpOverlay::create() {
-    if (_overlay) return;
-    _scheme = Theme::scheme();
+    if (_overlay)
+        return;
 
     _overlay = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(_overlay, 304, 190);
-    lv_obj_center(_overlay);
-    lv_obj_add_style(_overlay, LvTheme::styleModal(), 0);
-    lv_obj_set_style_pad_all(_overlay, 8, 0);
-    lv_obj_set_style_pad_row(_overlay, 1, 0);
-    lv_obj_set_layout(_overlay, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(_overlay, LV_FLEX_FLOW_COLUMN);
+    lv_obj_add_style(_overlay, Style::helpDialog, 0);
+
+    lv_obj_add_style(_overlay, Style::modalColor, 0);
+    lv_obj_add_style(_overlay, Style::modal, 0);
+    lv_obj_add_style(_overlay, Style::helpColumn, 0);
+
     lv_obj_clear_flag(_overlay, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(_overlay, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(_overlay, [](lv_event_t* e) {
+    lv_obj_add_event_cb(_overlay, [](lv_event_t *e) {
         auto* self = static_cast<LvHelpOverlay*>(lv_event_get_user_data(e));
-        if (self) self->hide();
-    }, LV_EVENT_CLICKED, this);
+        if (self) self->hide(); }, LV_EVENT_CLICKED, this);
 
-    lv_obj_t* header = makeRow(_overlay);
-    lv_obj_set_height(header, 16);
-    makeLabel(header, "HELP", &lv_font_rsdeck_12, Theme::ACCENT, 70, LV_TEXT_ALIGN_LEFT);
-    makeLabel(header, "Ratspeak.org", &lv_font_rsdeck_10,
-              Theme::TEXT_SECONDARY, 180, LV_TEXT_ALIGN_RIGHT);
+    lv_obj_t *header = lv_obj_create(_overlay);
+    lv_obj_add_style(header, Style::helpHeader, 0);
 
-    addHelpRow(_overlay, "Tap field", "Open text keyboard");
-    addHelpRow(_overlay, "Lang", "Switch EN / RU layout");
-    addHelpRow(_overlay, "Shift / 123", "Case / numbers and symbols");
-    addHelpRow(_overlay, "Done", "Apply text to the field");
-    addHelpRow(_overlay, "Cancel", "Keep the original text");
-    addHelpRow(_overlay, "SEND", "Send the prepared message");
-    addHelpRow(_overlay, "Chat", "Swipe history; hold message");
-    addHelpRow(_overlay, "Wake", "Tap once; then tap an action");
+    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* footer = makeLabel(_overlay,
-                                 "Tap to close",
-                                 &lv_font_rsdeck_10, Theme::TEXT_MUTED,
-                                 260, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_style_pad_top(footer, 2, 0);
+    lv_obj_t *headerCaption2 = lv_label_create(header);
+    lv_obj_add_style(headerCaption2, Style::helpTitle, 0);
+    lv_obj_add_style(headerCaption2, Style::fontBody, 0);
+    lv_obj_add_style(headerCaption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(headerCaption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(headerCaption2, "HELP");
+
+    lv_obj_t *headerCaption = lv_label_create(header);
+    lv_obj_add_style(headerCaption, Style::helpBrand, 0);
+    lv_obj_add_style(headerCaption, Style::fontCaption, 0);
+    lv_obj_add_style(headerCaption, Style::textSecondary, 0);
+
+    lv_label_set_long_mode(headerCaption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(headerCaption, "Ratspeak.org");
+
+    lv_obj_t *row4 = lv_obj_create(_overlay);
+    lv_obj_add_style(row4, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row4, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1025Caption2 = lv_label_create(row4);
+    lv_obj_add_style(rowElement1025Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1025Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1025Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1025Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1025Caption2, "Tap field");
+
+    lv_obj_t *rowElement1025Caption = lv_label_create(row4);
+    lv_obj_add_style(rowElement1025Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1025Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1025Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1025Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1025Caption, "Open text keyboard");
+
+    lv_obj_t *row = lv_obj_create(_overlay);
+    lv_obj_add_style(row, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1029Caption2 = lv_label_create(row);
+    lv_obj_add_style(rowElement1029Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1029Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1029Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1029Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1029Caption2, "Lang");
+
+    lv_obj_t *rowElement1029Caption = lv_label_create(row);
+    lv_obj_add_style(rowElement1029Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1029Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1029Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1029Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1029Caption, "Switch EN / RU layout");
+
+    lv_obj_t *row3 = lv_obj_create(_overlay);
+    lv_obj_add_style(row3, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row3, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1033Caption2 = lv_label_create(row3);
+    lv_obj_add_style(rowElement1033Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1033Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1033Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1033Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1033Caption2, "Shift / 123");
+
+    lv_obj_t *rowElement1033Caption = lv_label_create(row3);
+    lv_obj_add_style(rowElement1033Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1033Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1033Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1033Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1033Caption, "Case / numbers and symbols");
+
+    lv_obj_t *row2 = lv_obj_create(_overlay);
+    lv_obj_add_style(row2, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row2, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1037Caption2 = lv_label_create(row2);
+    lv_obj_add_style(rowElement1037Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1037Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1037Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1037Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1037Caption2, "Done");
+
+    lv_obj_t *rowElement1037Caption = lv_label_create(row2);
+    lv_obj_add_style(rowElement1037Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1037Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1037Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1037Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1037Caption, "Apply text to the field");
+
+    lv_obj_t *row5 = lv_obj_create(_overlay);
+    lv_obj_add_style(row5, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row5, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1041Caption2 = lv_label_create(row5);
+    lv_obj_add_style(rowElement1041Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1041Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1041Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1041Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1041Caption2, "Cancel");
+
+    lv_obj_t *rowElement1041Caption = lv_label_create(row5);
+    lv_obj_add_style(rowElement1041Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1041Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1041Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1041Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1041Caption, "Keep the original text");
+
+    lv_obj_t *row7 = lv_obj_create(_overlay);
+    lv_obj_add_style(row7, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row7, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1045Caption2 = lv_label_create(row7);
+    lv_obj_add_style(rowElement1045Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1045Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1045Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1045Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1045Caption2, "SEND");
+
+    lv_obj_t *rowElement1045Caption = lv_label_create(row7);
+    lv_obj_add_style(rowElement1045Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1045Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1045Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1045Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1045Caption, "Send the prepared message");
+
+    lv_obj_t *row8 = lv_obj_create(_overlay);
+    lv_obj_add_style(row8, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row8, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1049Caption2 = lv_label_create(row8);
+    lv_obj_add_style(rowElement1049Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1049Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1049Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1049Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1049Caption2, "Chat");
+
+    lv_obj_t *rowElement1049Caption = lv_label_create(row8);
+    lv_obj_add_style(rowElement1049Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1049Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1049Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1049Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1049Caption, "Swipe history; hold message");
+
+    lv_obj_t *row6 = lv_obj_create(_overlay);
+    lv_obj_add_style(row6, Style::helpRow, 0);
+
+    lv_obj_clear_flag(row6, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rowElement1053Caption2 = lv_label_create(row6);
+    lv_obj_add_style(rowElement1053Caption2, Style::helpKey, 0);
+    lv_obj_add_style(rowElement1053Caption2, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1053Caption2, Style::textAccent, 0);
+
+    lv_label_set_long_mode(rowElement1053Caption2, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1053Caption2, "Wake");
+
+    lv_obj_t *rowElement1053Caption = lv_label_create(row6);
+    lv_obj_add_style(rowElement1053Caption, Style::helpAction, 0);
+    lv_obj_add_style(rowElement1053Caption, Style::fontCaption, 0);
+    lv_obj_add_style(rowElement1053Caption, Style::textPrimary, 0);
+
+    lv_label_set_long_mode(rowElement1053Caption, LV_LABEL_LONG_DOT);
+    lv_label_set_text(rowElement1053Caption, "Tap once; then tap an action");
+
+    lv_obj_t *footer = lv_label_create(_overlay);
+    lv_obj_add_style(footer, Style::helpFooter, 0);
+    lv_obj_add_style(footer, Style::fontCaption, 0);
+    lv_obj_add_style(footer, Style::textMuted, 0);
+
+    lv_label_set_long_mode(footer, LV_LABEL_LONG_DOT);
+    lv_label_set_text(footer, "Tap to close");
 
     lv_obj_add_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
 }
 
 void LvHelpOverlay::show() {
-    if (_overlay && _scheme != Theme::scheme()) { lv_obj_del(_overlay); _overlay = nullptr; }
-    if (!_overlay) create();
+    if (!_overlay)
+        create();
     lv_obj_clear_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
     _visible = true;
 }
 
 void LvHelpOverlay::hide() {
-    if (_overlay) lv_obj_add_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
+    if (_overlay)
+        lv_obj_add_flag(_overlay, LV_OBJ_FLAG_HIDDEN);
     _visible = false;
 }
 
 void LvHelpOverlay::toggle() {
-    if (_visible) hide(); else show();
+    if (_visible)
+        hide();
+    else
+        show();
 }
 
-bool LvHelpOverlay::handleKey(const KeyEvent& event) {
+bool LvHelpOverlay::handleKey(const KeyEvent &event) {
     if (_visible) {
-        if (event.repeat) return true;  // dismiss only on a fresh keypress
+        if (event.repeat)
+            return true; // dismiss only on a fresh keypress
         hide();
         return true;
     }

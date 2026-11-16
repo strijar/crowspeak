@@ -4,8 +4,8 @@
 #include <string>
 
 class LvStatusBar {
-public:
-    void create(lv_obj_t* parent);
+  public:
+    void create(lv_obj_t *parent);
     void update();
 
     // Status setters
@@ -19,35 +19,33 @@ public:
     void setAutoIfacePeers(int n);
     void setGPSFix(bool hasFix);
     void setBatteryPercent(int pct);
-    void setBatteryDisplay(uint8_t mode);  // 0 = percent, 1 = bar
+    void setBatteryDisplay(uint8_t mode); // 0 = percent, 1 = bar
     void setCharging(bool charging);
     void flashAnnounce();
-    void showToast(const char* msg, uint32_t durationMs = 1500);
+    void showToast(const char *msg, uint32_t durationMs = 1500);
 
     // Time display
     void setUse24Hour(bool use24h);
-    void updateTime();   // Call at 1 Hz to refresh clock
+    void updateTime(); // Call at 1 Hz to refresh clock
 
-    // Re-apply palette-dependent local colors after a theme switch
-    void applyTheme();
+    lv_obj_t *obj() {
+        return _bar;
+    }
 
-    lv_obj_t* obj() { return _bar; }
-
-private:
+  private:
     void refreshIndicators();
     void refreshBattery();
     void refreshTimeColor();
 
-    lv_obj_t* _bar = nullptr;
-    lv_obj_t* _lblTime = nullptr;       // Left: current time
-    lv_obj_t* _lblLinks = nullptr;      // Center: brand/status text
-    lv_obj_t* _lblBatt = nullptr;       // Right: battery %
-    lv_obj_t* _barBatt = nullptr;       // Right: Battery bar
-    lv_obj_t* _wifiIcon = nullptr;
-    lv_obj_t* _wifiSlash = nullptr;
-    lv_obj_t* _toast = nullptr;
-    lv_obj_t* _lblToast = nullptr;
-
+    lv_obj_t *_bar = nullptr;
+    lv_obj_t *_lblTime = nullptr;  // Left: current time
+    lv_obj_t *_lblLinks = nullptr; // Center: brand/status text
+    lv_obj_t *_lblBatt = nullptr;  // Right: battery %
+    lv_obj_t *_barBatt = nullptr;  // Right: Battery bar
+    lv_obj_t *_wifiIcon = nullptr;
+    lv_obj_t *_wifiSlash = nullptr;
+    lv_obj_t *_toast = nullptr;
+    lv_obj_t *_lblToast = nullptr;
 
     bool _loraOnline = false;
     bool _bleActive = false;
@@ -55,17 +53,17 @@ private:
     bool _wifiActive = false;
     bool _wifiEnabled = false;
     bool _tcpConnected = false;
-    int _autoIfacePeers = -1;  // -1 hidden, 0 yellow, >0 green
+    int  _autoIfacePeers = -1; // -1 hidden, 0 yellow, >0 green
     bool _gpsFix = false;
     bool _use24h = false;
 
     // Battery
-    int _battPct = -1;
+    int     _battPct = -1;
     uint8_t _battDisplay = 0;
-    bool _isCharging = false;
+    bool    _isCharging = false;
 
-    int _lastHour = -1;
-    int _lastMinute = -1;
+    int           _lastHour = -1;
+    int           _lastMinute = -1;
     unsigned long _announceFlashEnd = 0;
     unsigned long _toastEnd = 0;
 };

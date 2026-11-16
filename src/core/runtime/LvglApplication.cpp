@@ -35,7 +35,6 @@
 #include "input/InputManager.h"
 #include "input/HotkeyManager.h"
 #include "UIManager.h"
-#include "Theme.h"
 #include "TouchKeyboard.h"
 #include "LvTabBar.h"
 #include "LvInput.h"
@@ -494,8 +493,6 @@ void handheld::lvgl_application::setup() {
     } else {
         Serial.println("[BOOT] Early flash mount failed; using default radio config");
     }
-    // Select palette before any LVGL styles are built
-    Theme::setScheme(userConfig.settings().themeLight ? Theme::Scheme::LIGHT : Theme::Scheme::DARK);
     bootTraceStage("early-flash-config");
 
     // Step 4: Radio + SD init BEFORE display
@@ -703,11 +700,6 @@ void handheld::lvgl_application::setup() {
         }
     }
 
-    // An SD recovery on first boot may supply the palette; re-sync it.
-    {
-        Theme::Scheme want = userConfig.settings().themeLight ? Theme::Scheme::LIGHT : Theme::Scheme::DARK;
-        if (want != Theme::scheme()) { Theme::setScheme(want); ::ui.applyTheme(); }
-    }
 #if HAS_TRACKBALL
     inputManager.setTrackballSpeed(userConfig.settings().trackballSpeed);
 #endif
@@ -1235,8 +1227,6 @@ void handheld::lvgl_application::setup() {
 
 static void applyUiSettings() {
     const auto& s = serviceClient.config.settings();
-    const auto scheme = s.themeLight ? Theme::Scheme::LIGHT : Theme::Scheme::DARK;
-    if (scheme != Theme::scheme()) { Theme::setScheme(scheme); ::ui.applyTheme(); }
     powerMgr.setBrightness(s.brightness);
     powerMgr.setDimTimeout(s.screenDimTimeout);
     powerMgr.setOffTimeout(s.screenOffTimeout);
