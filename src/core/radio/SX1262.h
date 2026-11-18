@@ -30,6 +30,9 @@ public:
 
     // --- RX ---
     void receive(int size = 0);
+    // Keep continuous RX and pending IRQs intact after consuming a packet.
+    void resumeReceive();
+    bool isRxBusy();
     int  available();
     int  read();
     int  peek();
@@ -115,7 +118,6 @@ private:
     void handleLowDataRate();
 
     void handleDio0Rise();
-    bool getPacketValidity();
     static void IRAM_ATTR onDio0Rise();
 
     SPISettings _spiSettings;
@@ -145,6 +147,8 @@ private:
     bool _dio2_as_rf_switch = false;
     uint8_t _imageCalBand = 0xFF;
     uint32_t _busyTimeouts = 0;
+    bool _rxActivityTracking = false;
+    uint32_t _rxActivitySince = 0;
     bool _txActive = false;
     bool _txFailed = false;
     bool _ioFailed = false;

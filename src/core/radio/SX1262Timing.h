@@ -145,6 +145,26 @@ constexpr uint32_t airtimeMs(uint16_t physicalBytes, Modem modem) {
     return static_cast<uint32_t>((numeratorMs + denominatorMs - 1) / denominatorMs);
 }
 
+// SX1261/2 datasheet 6.1.3: RX must be configured for the longest peer
+// preamble, because its preamble detector periodically restarts. Handheld
+// settings allow up to 65 symbols; still accept larger explicit TX settings.
+constexpr uint16_t receivePreambleSymbols(uint16_t transmitSymbols) {
+    return transmitSymbols < 65 ? 65 : transmitSymbols;
+}
+static_assert(receivePreambleSymbols(18) == 65);
+static_assert(receivePreambleSymbols(25) == 65);
+static_assert(receivePreambleSymbols(100) == 100);
+
+constexpr uint32_t receivePreambleTimeoutMs(uint8_t sf, uint8_t bwCode,
+                                          uint16_t transmitSymbols) {
+    const uint32_t bw = bandwidthHz(bwCode);
+    if (!bw || sf < 5 || sf > 12) return 0;
+    const uint64_t symbols = uint64_t{receivePreambleSymbols(transmitSymbols)} + 20;
+    return (symbols * (uint64_t{1} << sf) * 1000 + bw - 1) / bw;
+}
+static_assert(receivePreambleTimeoutMs(8, 0x03, 18) == 349);
+
+
 // UserConfig's declared modem envelope: SF5..12, CR5..8, preamble6..65,
 // all ten bandwidth codes. A maximum-length physical frame is the worst
 // possible next fragment, even when its Reticulum packet is shorter than 500.

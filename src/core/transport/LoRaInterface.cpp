@@ -181,7 +181,7 @@ handheld::TxOffer LoRaInterface::send_outgoing(const uint8_t* rawData, size_t ra
     // frame 2 to be lost (LoRa is half-duplex).
     if (!_online || _maintenance || (lease && (!lease->generation || !_validator ||
                   !_validator(_validatorContext, *lease)))) return reject();
-    if (_txPending || _splitTxPending || _splitRxPending || !pacingReady() || _txCount) {
+    if (_txPending || _splitTxPending || _splitRxPending || !pacingReady() || _txCount || _radio->isRxBusy()) {
         if (_txCount < TX_QUEUE_MAX) {
             auto& frame = _txQueue[_txCount++];
             memcpy(frame.data.data(), rawData, rawLen);
@@ -229,7 +229,7 @@ uint32_t LoRaInterface::txWaitBudgetMs(uint32_t packets) const {
 bool LoRaInterface::drainTx() {
     if (_changingOwner || _notifying || !_online || _maintenance) return false;
     discardExpired();
-    if (!_online || _txPending || _splitTxPending || _splitRxPending || !pacingReady() || !_txCount)
+    if (!_online || _txPending || _splitTxPending || _splitRxPending || !pacingReady() || !_txCount || _radio->isRxBusy())
         return false;
     while (_txCount && !queueLive(_txQueue[0]))
         removeQueued(0, handheld::TxReceiptEvent::Dropped,
@@ -401,12 +401,12 @@ void LoRaInterface::loop() {
         if (packetSize > 0) {
             Serial.printf("[LORA_IF] RX runt packet (%d bytes), discarding\n", packetSize);
         }
-        _radio->receive();
+        _radio->resumeReceive();
         return;
     }
 
     uint8_t raw[MAX_PACKET_SIZE];
-    if (packetSize > static_cast<int>(sizeof(raw))) { _radio->receive(); return; }
+    if (packetSize > static_cast<int>(sizeof(raw))) { _radio->resumeReceive(); return; }
     memcpy(raw, _radio->packetBuffer(), packetSize);
 
     // Capture signal quality before any further processing
@@ -421,7 +421,7 @@ void LoRaInterface::loop() {
     // A saved retune waits for the existing split, not an endless stream of
     // replacement first halves. Preserve its original deadline and bytes.
     if (_reconfigurePending && isSplit && (!_splitRxPending || seq != _splitRxSeq)) {
-        if (!drainTx() && !_txPending) _radio->receive();
+        if (!drainTx() && !_txPending) _radio->resumeReceive();
         return;
     }
 
@@ -437,7 +437,7 @@ void LoRaInterface::loop() {
 
             Serial.printf("[LORA_IF] RX SPLIT frame 1: %d bytes (seq=0x%02X), RSSI=%d, SNR=%.1f, timeout=%lums\n",
                 payloadSize, seq, _lastRxRssi, _lastRxSnr, _splitRxTimeoutMs);
-            _radio->receive();
+            _radio->resumeReceive();
             return;
         } else if (seq == _splitRxSeq) {
             // Second frame matches — reassemble
@@ -454,7 +454,7 @@ void LoRaInterface::loop() {
             if (totalSize > RETICULUM_MTU) {
                 Serial.printf("[LORA_IF] RX SPLIT over MTU (%d) — dropped\n", (int)totalSize);
                 _splitRxLength = 0;
-                if (!drainTx() && !_txPending) _radio->receive();
+                if (!drainTx() && !_txPending) _radio->resumeReceive();
                 return;
             }
             memcpy(_splitRxBuffer.data() + _splitRxLength, raw + RNODE_HEADER_L, payloadSize);
@@ -465,7 +465,7 @@ void LoRaInterface::loop() {
             _splitRxLength = 0;
 
             // Drain any TX that was deferred during split RX hold
-            if (!drainTx() && !_txPending) _radio->receive();
+            if (!drainTx() && !_txPending) _radio->resumeReceive();
             return;
         } else {
             // Different split packet's frame 1 arrived — the previous split is lost.
@@ -476,7 +476,7 @@ void LoRaInterface::loop() {
             memcpy(_splitRxBuffer.data(), raw + RNODE_HEADER_L, payloadSize);
             _splitRxLength = payloadSize;
             _splitRxTimestamp = millis();
-            _radio->receive();
+            _radio->resumeReceive();
             return;
         }
     }
@@ -497,7 +497,7 @@ void LoRaInterface::loop() {
     }
 
     if (!_txPending) {
-        _radio->receive();
+        _radio->resumeReceive();
     }
 }
 

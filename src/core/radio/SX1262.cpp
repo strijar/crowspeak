@@ -523,19 +523,16 @@ size_t SX1262::write(const uint8_t* buffer, size_t size) {
 }
 
 void SX1262::receive(int size) {
+    _rxActivityTracking = false;
     standby();
     if (!ensureLoRaMode("receive")) return;
 
     uint8_t clear[2] = {0xFF, 0xFF};
     executeOpcode(OP_CLEAR_IRQ_STATUS_6X, clear, 2);
 
-    if (size > 0) {
-        implicitHeaderMode();
-        _payloadLength = size;
-        setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
-    } else {
-        explicitHeaderMode();
-    }
+    _implicitHeaderMode = size > 0 ? 1 : 0;
+    setPacketParams(handheld::sx1262_timing::receivePreambleSymbols(_preambleLength),
+                    _implicitHeaderMode, size > 0 ? size : MAX_PACKET_SIZE, _crcMode);
 
     // Set up DIO1 interrupt for RX done (enables packetAvailable flag)
     if (!_onReceive) {
@@ -553,12 +550,54 @@ void SX1262::receive(int size) {
     executeOpcode(OP_RX_6X, mode, 3);
 }
 
+bool SX1262::isRxBusy() {
+    if (_ioFailed || _txActive) return true;
+    uint8_t irq[2] = {};
+    executeOpcodeRead(OP_GET_IRQ_STATUS_6X, irq, 2);
+    if (_ioFailed) return true;
+    // A completed frame belongs to the RX consumer, never to TX admission.
+    if (irq[1] & IRQ_RX_DONE_MASK_6X) {
+        _rxActivityTracking = false;
+        return true;
+    }
+    const uint8_t activity = irq[1] & (IRQ_PREAMBLE_DET_MASK_6X | IRQ_HEADER_DET_MASK_6X);
+    if (!activity) { _rxActivityTracking = false; return false; }
+    const uint32_t now = millis();
+    if (!_rxActivityTracking) { _rxActivitySince = now; _rxActivityTracking = true; }
+    const uint32_t budget = (activity & IRQ_HEADER_DET_MASK_6X)
+        ? handheld::sx1262_timing::airtimeMs(MAX_PACKET_SIZE, {
+              _sf, _bw, getCodingRate4(),
+              handheld::sx1262_timing::receivePreambleSymbols(_preambleLength),
+              _implicitHeaderMode != 0, _crcMode != 0, _ldro}) + 1000
+        : handheld::sx1262_timing::receivePreambleTimeoutMs(_sf, _bw, _preambleLength);
+    if (uint32_t(now - _rxActivitySince) <= budget) return true;
+    // Noise can latch an indication forever. Retire only the expired indication,
+    // without standby/SetRx or clearing a later RX_DONE.
+    uint8_t clear[2] = {0, activity};
+    executeOpcode(OP_CLEAR_IRQ_STATUS_6X, clear, 2);
+    _rxActivityTracking = false;
+    // Recheck: a header or RX_DONE may have appeared during acknowledgement.
+    executeOpcodeRead(OP_GET_IRQ_STATUS_6X, irq, 2);
+    return _ioFailed || (irq[1] & (IRQ_RX_DONE_MASK_6X |
+                                  IRQ_PREAMBLE_DET_MASK_6X | IRQ_HEADER_DET_MASK_6X));
+}
+
+void SX1262::resumeReceive() {
+    if (_ioFailed || _txActive) return;
+    // SetRx(0xffffff) stays in RX after RX_DONE, including CRC failures.
+    // Restarting here can abort the next frame or erase its pending RX_DONE.
+    if ((getStatus() & 0x70) != 0x50) receive();
+}
+
 int SX1262::parsePacket(int size) {
     uint8_t buf[2] = {0};
     executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
     if ((buf[1] & IRQ_RX_DONE_MASK_6X) == 0) { return 0; }
 
-    uint8_t mask[2] = {0x00, IRQ_RX_DONE_MASK_6X};
+    // Validate the completed packet using the same IRQ snapshot we acknowledge.
+    // A second read/clear later can consume IRQs belonging to the next frame.
+    const bool crcOk = (buf[1] & IRQ_PAYLOAD_CRC_ERROR_MASK_6X) == 0;
+    uint8_t mask[2] = {buf[0], buf[1]};
     executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
 
     // Read buffer info
@@ -575,13 +614,11 @@ int SX1262::parsePacket(int size) {
         return 0;
     }
 
-    // Read RSSI/SNR before clearing IRQ
+    // Read RSSI/SNR for the completed packet
     uint8_t pktStat[3] = {0};
     executeOpcodeRead(OP_PACKET_STATUS_6X, pktStat, 3);
     float rssi = -float(pktStat[0]) / 2.0;
     float snr  = float((int8_t)pktStat[1]) * 0.25;
-
-    bool crcOk = getPacketValidity();
 
     // Always read FIFO data for diagnostics
     _packetIndex = 0;
@@ -597,7 +634,7 @@ int SX1262::parsePacket(int size) {
             if ((i & 0x1F) == 0x1F) Serial.println();
         }
         Serial.println();
-        receive();
+        resumeReceive();
         return 0;
     }
 
@@ -691,13 +728,6 @@ uint16_t SX1262::getIrqFlags() {
     uint8_t buf[2] = {0};
     executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
     return (uint16_t)(buf[0] << 8 | buf[1]);
-}
-
-bool IRAM_ATTR SX1262::getPacketValidity() {
-    uint8_t buf[2] = {0};
-    executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
-    executeOpcode(OP_CLEAR_IRQ_STATUS_6X, buf, 2);
-    return (buf[1] & IRQ_PAYLOAD_CRC_ERROR_MASK_6X) == 0;
 }
 
 void SX1262::setFrequency(uint32_t frequency) {

@@ -51,3 +51,20 @@ use `protocol/prebuilt/xtensa-esp32s3/small/libratspeak_protocol.a`.
 
 Derived from Ratspeak Handheld. See [contributors](CONTRIBUTORS.md), [license](LICENSE)
 and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+### SX1262 receive behaviour
+
+RX uses at least 65 preamble symbols independently of the configured TX length
+(or the TX length when it exceeds 65). Explicit RX restores the full 255-byte
+limit after transmission. Consuming a received packet preserves continuous RX
+and pending IRQs; standby recovery and TX completion still restore RX normally.
+CRC validation and IRQ acknowledgement use the same snapshot.
+
+Run `python3 tools/test_standalone_rx.py` for the host regression test and
+`make check DEVICE=crowpanel` for the normal firmware build and size check.
+
+TX admission also waits while SX1262 reports a preamble, header or pending
+RX_DONE. This applies to immediate and queued packets so a local announce does
+not interrupt an incoming frame. Stale activity flags have bounded timeouts;
+clearing them does not restart RX. `PEERS` counts discovered `lxmf.delivery`
+entries, not all received packets or all announce aspects.
